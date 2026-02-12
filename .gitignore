@@ -1,3 +1,4 @@
 .env
 virtual
 manage.py
+sent_emails
