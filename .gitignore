@@ -1,4 +1,4 @@
 .env
-virtual/*
+virtual/
 manage.py
-sent_emails/*
+sent_emails/
