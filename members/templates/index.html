@@ -8,9 +8,12 @@
 <body>
     This is the index page
 
+    {% if user.is_authenticated %}
     <form method="post" action="{% url 'logout' %}">
-    {% csrf_token %}
-    <button type="submit">Logout</button>
+        {% csrf_token %}
+        <button type="submit">Logout</button>
+    </form>
+    {% endif %}
 </form>
 </body>
 </html>
