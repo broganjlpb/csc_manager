@@ -1,0 +1,283 @@
+python.exe -m pip install --upgrade pip
+python -m venv virtual
+virtual\Scripts\activate 
+django-admin startproject csc_manager .
+python manage.py startapp members
+
+Update the Member Model
+members/models.py
+
+    from django.contrib.auth.models import AbstractUser
+    from django.db import models
+    from django.core.exceptions import ValidationError
+
+    class Member(AbstractUser):
+        # Alias (renamed username)
+        username = models.CharField(
+            max_length=150,
+            unique=True,
+            null=True,
+            blank=True,
+            verbose_name="Alias"
+        )
+
+        email = models.EmailField(
+            unique=True,
+            verbose_name="Email Address"
+        )
+
+        full_name = models.CharField(
+            max_length=255,
+            blank=True,
+            help_text="Full name as an alternative to first and last name"
+        )
+
+        email_verified = models.BooleanField(
+            default=False,
+            help_text="Designates whether the user's email has been verified"
+        )
+
+        USERNAME_FIELD = "email"
+        REQUIRED_FIELDS = ["username"]
+
+        def clean(self):
+            super().clean()
+
+            # Enforce case-insensitive uniqueness for alias
+            if self.username:
+                qs = Member.objects.filter(username__iexact=self.username)
+                if self.pk:
+                    qs = qs.exclude(pk=self.pk)
+                if qs.exists():
+                    raise ValidationError({"username": "This alias is already in use."})
+
+        def get_full_name(self):
+            if self.full_name:
+                return self.full_name
+            return f"{self.first_name} {self.last_name}".strip()
+
+        def get_short_name(self):
+            return self.full_name or self.username or self.email
+
+        def __str__(self):
+            return self.email
+
+Tell Django to Use Your Custom User Model
+CSC/settings.py
+
+    INSTALLED_APPS = [
+        "members",
+        "django.contrib.admin",
+        "django.contrib.auth",
+        "django.contrib.contenttypes",
+        "django.contrib.sessions",
+        "django.contrib.messages",
+        "django.contrib.staticfiles",
+    ]
+
+    AUTH_USER_MODEL = "members.Member"
+
+Configure Authentication Backends
+Django still assumes USERNAME_FIELD for login, so email will work automatically, but you want email OR alias login.
+CSC/settings.py
+
+    AUTHENTICATION_BACKENDS = [
+        "members.backends.EmailOrAliasBackend",
+        "django.contrib.auth.backends.ModelBackend",
+    ]
+
+Create a Custom Authentication Backend
+members/backends.py
+
+    from django.contrib.auth.backends import ModelBackend
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    UserModel = get_user_model()
+
+    class EmailOrAliasBackend(ModelBackend):
+        def authenticate(self, request, username=None, password=None, **kwargs):
+            try:
+                user = UserModel.objects.get(
+                    Q(email__iexact=username) | Q(username__iexact=username)
+                )
+            except UserModel.DoesNotExist:
+                return None
+
+            if user.check_password(password) and self.user_can_authenticate(user):
+                return user
+            return None
+
+
+
+Admin Panel Updates
+members/admin.py
+
+    from django.contrib import admin
+    from django.contrib.auth.admin import UserAdmin
+    from .models import Member
+
+    @admin.register(Member)
+    class MemberAdmin(UserAdmin):
+        model = Member
+
+        list_display = (
+            "email",
+            "username",
+            "full_name",
+            "email_verified",
+            "is_staff",
+            "is_active",
+        )
+
+        ordering = ("email",)
+
+        fieldsets = (
+            (None, {"fields": ("email", "password")}),
+            ("Personal Info", {"fields": ("username", "full_name", "first_name", "last_name")}),
+            ("Verification", {"fields": ("email_verified",)}),
+            ("Permissions", {"fields": ("is_staff", "is_active", "groups", "user_permissions")}),
+            ("Important Dates", {"fields": ("last_login", "date_joined")}),
+        )
+
+        add_fieldsets = (
+            (None, {
+                "classes": ("wide",),
+                "fields": (
+                    "email",
+                    "username",
+                    "full_name",
+                    "password1",
+                    "password2",
+                    "is_staff",
+                    "is_active",
+                ),
+            }),
+        )
+
+Update Forms (Optional but Recommended)
+members/forms.py
+    from django.contrib.auth.forms import AuthenticationForm
+
+    class EmailOrAliasAuthenticationForm(AuthenticationForm):
+        username = forms.CharField(label="Email or Alias")
+
+Login View (Optional)
+If you’re using Django’s default auth views:
+    from django.contrib.auth import views as auth_views
+    from members.forms import EmailOrAliasAuthenticationForm
+
+    urlpatterns = [
+        path(
+            "login/",
+            auth_views.LoginView.as_view(
+                authentication_form=EmailOrAliasAuthenticationForm
+            ),
+            name="login",
+        ),
+    ]
+
+
+Email Verification Token Model
+members/models.py (append below Member)
+
+    import uuid
+    from django.conf import settings
+
+    class EmailVerificationToken(models.Model):
+        user = models.OneToOneField(
+            settings.AUTH_USER_MODEL,
+            on_delete=models.CASCADE,
+            related_name="email_verification_token"
+        )
+        token = models.UUIDField(default=uuid.uuid4, unique=True)
+        created_at = models.DateTimeField(auto_now_add=True)
+
+        def __str__(self):
+            return f"Email verification for {self.user.email}"
+
+Create Verification Email Logic
+members/utils.py
+
+    from django.conf import settings
+    from django.core.mail import send_mail
+    from django.urls import reverse
+
+    def send_verification_email(request, user):
+        token = user.email_verification_token.token
+
+        verify_url = request.build_absolute_uri(
+            reverse("verify-email", args=[str(token)])
+        )
+
+        send_mail(
+            subject="Verify your email address",
+            message=f"Click the link to verify your email:\n\n{verify_url}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+
+
+Email Verification View
+members/views.py
+
+    from django.shortcuts import redirect, get_object_or_404
+    from django.http import HttpResponse
+    from .models import EmailVerificationToken
+
+    def verify_email(request, token):
+        verification = get_object_or_404(EmailVerificationToken, token=token)
+
+        user = verification.user
+        user.email_verified = True
+        user.save()
+
+        verification.delete()
+
+        return HttpResponse("Your email has been verified successfully.")
+
+URLs
+members/urls.py
+
+    from django.urls import path
+    from .views import verify_email
+
+    urlpatterns = [
+        path("verify-email/<uuid:token>/", verify_email, name="verify-email"),
+    ]
+CSC/urls.py
+
+    path("members/", include("members.urls")),
+
+Trigger Email Verification on Registration
+Example signup logic (view or signal)
+Option A — Signal (recommended)
+members/signals.py
+
+    from django.db.models.signals import post_save
+    from django.dispatch import receiver
+    from django.conf import settings
+    from .models import EmailVerificationToken
+
+    @receiver(post_save, sender=settings.AUTH_USER_MODEL)
+    def create_email_verification(sender, instance, created, **kwargs):
+        if created:
+            EmailVerificationToken.objects.create(user=instance)
+members/apps.py
+
+    from django.apps import AppConfig
+
+    class MembersConfig(AppConfig):
+        name = "members"
+
+        def ready(self):
+            import members.signals
+members/__init__.py
+    default_app_config = "members.apps.MembersConfig"
+
+Migrations
+python manage.py makemigrations
+python manage.py migrate
+python manage.py createsuperuser
+

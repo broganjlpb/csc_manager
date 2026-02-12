@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Login</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .error { color: red; }
+        .field { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<h2>Login</h2>
+
+{% if form.non_field_errors %}
+    {% for error in form.non_field_errors %}
+        <p class="error">{{ error }}</p>
+    {% endfor %}
+    <a href="{% url 'resend-verification' %}">
+        Resend verification email
+    </a>
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+
+    <div class="field">
+        <label for="{{ form.username.id_for_label }}">Email or Alias</label><br>
+        {{ form.username }}
+        {{ form.username.errors }}
+    </div>
+
+    <div class="field">
+        <label for="{{ form.password.id_for_label }}">Password</label><br>
+        {{ form.password }}
+        {{ form.password.errors }}
+    </div>
+
+    <button type="submit">Login</button>
+</form>
+
+</body>
+</html>
+
