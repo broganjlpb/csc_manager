@@ -1,0 +1,188 @@
+{% load bootstrap5 %}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>{% block title %}CSC{% endblock %}</title>
+
+    {% bootstrap_css %}
+    {% bootstrap_javascript %}
+
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon_32.png' %}">
+
+    <style>
+        body {
+            background-color: #f4f6f9;
+        }
+
+        .logo {
+            height: 65px;
+            width: auto;
+            max-width: none;
+            display: block;
+        }
+
+        /* ===== Sidebar ===== */
+        .sidebar {
+            min-height: calc(100vh - 56px);
+            border-right: 1px solid #e5e5e5;
+            background: white;
+        }
+
+        .sidebar-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #6c757d;
+            margin-bottom: 1rem;
+        }
+
+        .menu-link {
+            display: block;
+            padding: 0.6rem 0.75rem;
+            margin-bottom: 0.25rem;
+            border-radius: 0.4rem;
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .menu-link:hover {
+            background-color: #f1f3f5;
+            text-decoration: none;
+        }
+
+        .menu-link.active {
+            background-color: #212529;
+            color: white;
+        }
+
+        /* ===== Activity Panel ===== */
+        .activity-panel {
+            background: white;
+            border-left: 1px solid #e5e5e5;
+            min-height: calc(100vh - 56px);
+        }
+
+        .activity-panel .card {
+            margin-bottom: 0.75rem;
+        }
+
+        .navbar-brand {
+            flex: 0 0 auto;
+            max-width: none;
+        }
+
+        .navbar-brand img {
+            max-width: none !important;
+        }
+
+        .navbar > .container-fluid {
+            flex-wrap: nowrap;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- ================= NAVBAR ================= -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+
+        <!-- Mobile sidebar toggle -->
+        <button class="btn btn-outline-light me-1 d-lg-none"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#sidebar">
+            ☰
+        </button>
+
+        <!-- Logo -->
+        <a class="navbar-brand d-flex align-items-centre" href="/">
+            <img src="{% static 'img/csc_logo_cropped.png' %}" class="logo">
+        </a>
+
+        <div class="ms-auto">
+
+            {% if user.is_authenticated %}
+            <div class="dropdown">
+                <a class="btn btn-outline-light dropdown-toggle"
+                   data-bs-toggle="dropdown">
+                    {{ user.get_short_name|default:user.email }}
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <a class="dropdown-item" href="#">Profile</a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="post" action="{% url 'logout' %}">
+                            {% csrf_token %}
+                            <button class="dropdown-item">Logout</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+            {% else %}
+                <a class="btn btn-outline-light" href="{% url 'login' %}">
+                    Login
+                </a>
+            {% endif %}
+
+        </div>
+    </div>
+</nav>
+
+<!-- ================= PAGE ================= -->
+<div class="container-fluid">
+    <div class="row">
+
+        <!-- ========== LEFT SIDEBAR (desktop) ========== -->
+        <div class="col-lg-2 d-none d-lg-block sidebar p-3">
+            <div class="sidebar-title">Menu</div>
+            {% include "components/sidebar_menu.html" %}
+        </div>
+
+        <!-- ========== LEFT SIDEBAR (mobile offcanvas) ========== -->
+        <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebar">
+            <div class="offcanvas-header">
+                <h5>Menu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+            </div>
+            <div class="offcanvas-body">
+               {% include "components/sidebar_menu.html" %}
+            </div>
+        </div>
+
+        <!-- ========== MAIN CONTENT ========== -->
+        <main class="col-lg-8 col-12 p-4">
+            {% block content %}
+            <h1>Welcome to CSC</h1>
+            {% endblock %}
+        </main>
+
+        <!-- ========== RIGHT PANEL ========== -->
+        <div class="col-lg-2 d-none d-lg-block activity-panel p-3">
+            <div class="sidebar-title">Recent Activity</div>
+
+            {% block rightpanel %}
+            <div class="card">
+                <div class="card-body small text-muted">
+                    Nothing yet.
+                </div>
+            </div>
+            {% endblock %}
+        </div>
+
+    </div>
+</div>
+
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

@@ -1,16 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>Login</title>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        .error { color: red; }
-        .field { margin-bottom: 10px; }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h2>Login</h2>
+{% block title %}Home{% endblock %}
+
+{% block content %}
+    <h2>Login</h2>
 
 {% if form.non_field_errors %}
     {% for error in form.non_field_errors %}
@@ -44,7 +37,6 @@
         Forgot password?
     </a>
 </p>
-
-</body>
-</html>
+    
+{% endblock %}
 
