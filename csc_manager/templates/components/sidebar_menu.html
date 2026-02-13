@@ -25,5 +25,8 @@
    href="/admin">
     Backend Administration
 </a>
-
+<a class="menu-link {% if request.resolver_match.url_name == 'permission-dashboard' %}active{% endif %}"
+   href="{% url 'permission-dashboard' %}">
+    Permissions Dashboard
+</a>
 
