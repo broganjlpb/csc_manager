@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Leagues{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Leagues</h3>
+
+    <div class="d-flex gap-2">
+
+        {% if request.GET.current %}
+            <a href="{% url 'leagues-list' %}"
+               class="btn btn-outline-secondary btn-sm">
+                Show All
+            </a>
+        {% else %}
+            <a href="?current=1"
+               class="btn btn-outline-primary btn-sm">
+                Current Only
+            </a>
+        {% endif %}
+
+        <a href="{% url 'leagues-add' %}" class="btn btn-dark btn-sm">
+            Add League
+        </a>
+
+    </div>
+</div>
+
+{% if request.GET.current %}
+<div class="alert alert-info py-2">
+    Showing currently active leagues only.
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for league in leagues %}
+                <tr>
+                    <td>{{ league.name }}</td>
+                    <td>{{ league.description }}</td>
+                    <td>{{ league.date_from }}</td>
+                    <td>{{ league.date_to }}</td>
+                    
+                    <td class="text-end">
+                        {% if perms.races.change_league %}
+                            <a href="{% url 'leagues-edit' league.pk %}"
+                            class="btn btn-sm btn-outline-primary">
+                                Edit
+                            </a>
+                        {% else %}
+                            <a href="{% url 'leagues-edit' league.pk %}"
+                            class="btn btn-sm btn-outline-secondary disabled">
+                                Edit
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">
+                        No Leagues yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

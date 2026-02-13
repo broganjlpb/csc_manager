@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Members{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Members</h3>
+
+    <div class="d-flex gap-2 align-items-center">
+
+    <div class="input-group input-group-sm" style="width: 220px;">
+        <input type="text"
+               id="searchInput"
+               name="q"
+               value="{{ request.GET.q }}"
+               placeholder="Search..."
+               class="form-control">
+
+        {% if request.GET.q %}
+        <button class="btn btn-outline-secondary" id="clearSearch">
+            ✕
+        </button>
+        {% endif %}
+    </div>
+
+    <a href="{% url 'member-add' %}" class="btn btn-dark btn-sm">
+        Add Member
+    </a>
+
+</div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Alias</th>
+                    <!-- <th>Name</th> -->
+                    <!-- <th>Email</th> -->
+                    <th>Default Boat</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in members %}
+                <tr>
+                    <td>{{ member.username }}</td>
+                    <!-- <td>{{ member.get_full_name }}</td> -->
+                    <!-- <td>{{ member.email }}</td> -->
+                    <td>{{ member.default_boat }}</td>
+                    <td class="text-end">
+                        <a href="{% url 'member-edit' member.pk %}"
+                           class="btn btn-sm btn-outline-primary">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">
+                        No members yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% if is_paginated %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?q={{ request.GET.q }}&page={{ page_obj.previous_page_number }}">
+                Previous
+            </a>
+        </li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+            <a class="page-link"
+               href="?q={{ request.GET.q }}&page={{ num }}">
+                {{ num }}
+            </a>
+        </li>
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?q={{ request.GET.q }}&page={{ page_obj.next_page_number }}">
+                Next
+            </a>
+        </li>
+        {% endif %}
+
+    </ul>
+</nav>
+{% endif %}
+
+{% block extra_js %}
+<script>
+    const input = document.getElementById("searchInput");
+    const clearBtn = document.getElementById("clearSearch");
+
+    let timer = null;
+
+    if (input) {
+        input.addEventListener("input", function () {
+            clearTimeout(timer);
+
+            timer = setTimeout(() => {
+                const value = input.value.trim();
+                const url = new URL(window.location);
+
+                if (value) {
+                    url.searchParams.set("q", value);
+                    url.searchParams.set("page", 1);
+                } else {
+                    url.searchParams.delete("q");
+                }
+
+                window.location = url;
+            }, 400);
+        });
+
+        // ⭐ restore focus after reload
+        if (input.value) {
+            input.focus();
+            const length = input.value.length;
+            input.setSelectionRange(length, length);
+        }
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener("click", function () {
+            const url = new URL(window.location);
+            url.searchParams.delete("q");
+            url.searchParams.delete("page");
+            window.location = url;
+        });
+    }
+</script>
+{% endblock %}
+
+
+
+{% endblock %}

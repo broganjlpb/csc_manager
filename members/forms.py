@@ -2,9 +2,13 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
+from .models import Member
 
 class EmailOrAliasAuthenticationForm(AuthenticationForm):
-    username = forms.CharField(label="Email or Alias")
+    username = forms.CharField(
+        label="Email or Alias",
+        widget=forms.TextInput(attrs={"autofocus": True}),
+        )
 
     def confirm_login_allowed(self, user):
         if not user.email_verified:
@@ -30,3 +34,16 @@ class ResendVerificationEmailForm(forms.Form):
 
         self.user = user
         return email
+    
+class MemberForm(forms.ModelForm):
+    class Meta:
+        model = Member
+        fields = [
+            "email",
+            "username",
+            "full_name",
+            # "first_name",
+            # "last_name",
+            "default_boat",
+            "is_active",
+        ]

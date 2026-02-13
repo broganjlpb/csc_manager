@@ -1,3 +1,29 @@
-<a class="menu-link active" href="#">Dashboard</a>
-<a class="menu-link" href="#">Bookings</a>
-<a class="menu-link" href="#">Members</a>
+<div class="sidebar-title">Menu</div>
+<a class="menu-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}"
+   href="{% url 'index' %}">
+    Dashboard
+</a>
+<a class="menu-link {% if request.resolver_match.url_name == 'member-list' %}active{% endif %}"
+   href="{% url 'member-list' %}">
+    Members
+</a>
+<div class="sidebar-title">BACKGROUND DATA</div>
+<a class="menu-link {% if request.resolver_match.url_name == 'boattype-list' %}active{% endif %}"
+   href="{% url 'boattype-list' %}">
+    Boat Types
+</a>
+<a class="menu-link {% if request.resolver_match.url_name == 'registered-boats-list' %}active{% endif %}"
+   href="{% url 'registered-boats-list' %}">
+    Registered Boats
+</a>
+<a class="menu-link {% if request.resolver_match.url_name == 'leagues-list' %}active{% endif %}"
+   href="{% url 'leagues-list' %}">
+    Leagues
+</a>
+<div class="sidebar-title">ADMINISTRATORS ONLY</div>
+<a class="menu-link {% if request.resolver_match.url_name == 'admin' %}active{% endif %}"
+   href="/admin">
+    Backend Administration
+</a>
+
+

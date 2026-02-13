@@ -6,6 +6,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 import uuid
 from django.conf import settings
+from races.models import RegisteredBoat
 
 class Member(AbstractUser):
     # Alias (renamed username)
@@ -31,6 +32,14 @@ class Member(AbstractUser):
     email_verified = models.BooleanField(
         default=False,
         help_text="Designates whether the user's email has been verified"
+    )
+
+    default_boat = models.ForeignKey(
+        "races.RegisteredBoat",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="default_for_members",
     )
 
     USERNAME_FIELD = "email"

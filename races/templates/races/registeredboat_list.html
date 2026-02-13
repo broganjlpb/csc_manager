@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Registered Boats{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Registered Boats</h3>
+    <a href="{% url 'registered-boats-add' %}" class="btn btn-dark">
+        Register a Boat
+    </a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Sail Number</th>
+                    <th>Boat Type</th>
+                    <th>PY</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for registeredboat in registeredboats %}
+                <tr>
+                    <td>{{ registeredboat.sail_number }}</td>
+                    <td>{{ registeredboat.boat_type }}</td>
+                    <td>{{ registeredboat.boat_type.py }}</td>
+                    <td class="text-end">
+                        <a href="{% url 'registered-boats-edit' registeredboat.pk %}"
+                           class="btn btn-sm btn-outline-primary">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">
+                        No registered boats yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

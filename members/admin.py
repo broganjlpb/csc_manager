@@ -13,13 +13,14 @@ class MemberAdmin(UserAdmin):
         "email_verified",
         "is_staff",
         "is_active",
+        "default_boat"
     )
 
     ordering = ("email",)
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Personal Info", {"fields": ("username", "full_name", "first_name", "last_name")}),
+        ("Personal Info", {"fields": ("username", "full_name", "first_name", "last_name", "default_boat")}),
         ("Verification", {"fields": ("email_verified",)}),
         ("Permissions", {"fields": ("is_staff", "is_active", "groups", "user_permissions")}),
         ("Important Dates", {"fields": ("last_login", "date_joined")}),

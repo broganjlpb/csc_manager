@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Boat Types{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Boat Types</h3>
+    <a href="{% url 'boattype-add' %}" class="btn btn-dark">
+        Add Boat Type
+    </a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>PY</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for boat in boats %}
+                <tr>
+                    <td>{{ boat.name }}</td>
+                    <td>{{ boat.description }}</td>
+                    <td>{{ boat.py }}</td>
+                    <td class="text-end">
+                        <a href="{% url 'boattype-edit' boat.pk %}"
+                           class="btn btn-sm btn-outline-primary">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">
+                        No boat types yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
