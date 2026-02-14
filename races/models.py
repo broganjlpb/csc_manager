@@ -100,50 +100,7 @@ class Race(models.Model):
 
     def __str__(self):
         return f"Race on {self.event.start_datetime}"
-    
-class Race(models.Model):
-    event = models.OneToOneField(Event, on_delete=models.CASCADE)
-
-    league = models.ForeignKey(
-        "races.League",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="races",
-    )
-
-    race_officer = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="races_as_ro",
-    )
-
-    assistant_race_officer = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="races_as_aro",
-    )
-
-    class RaceStatus(models.TextChoices):
-        DRAFT = "draft", "Draft"
-        OPEN = "open", "Open"
-        RUNNING = "running", "Running"
-        FINISHED = "finished", "Finished"
-        VERIFIED = "verified", "Verified"
-        LOCKED = "locked", "Locked"
-
-    status = models.CharField(
-        max_length=20,
-        choices=RaceStatus.choices,
-        default=RaceStatus.DRAFT,
-    )
-
-    def __str__(self):
-        return f"Race on {self.event.start_datetime}"
-    
+      
 class RaceEntry(models.Model):
     race = models.ForeignKey(Race, on_delete=models.CASCADE, related_name="entries")
 
@@ -169,6 +126,7 @@ class RaceEntry(models.Model):
     # snapshot fields ⭐⭐⭐
     boat_type_name = models.CharField(max_length=200)
     py_used = models.IntegerField()
+    finish_position = models.PositiveIntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

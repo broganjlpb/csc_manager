@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="mb-3">Manual Results – {{ race }}</h3>
+
+<form method="post" id="results-form">
+    {% csrf_token %}
+
+    <ul id="finish-order" class="list-group mb-3">
+        {% for e in entries %}
+        <li class="list-group-item d-flex justify-content-between align-items-center"
+            data-id="{{ e.id }}">
+            <span>
+                <strong class="pos-number">{{ forloop.counter }}.</strong>
+                {{ e.boat }} – {{ e.helm.username }} {% if e.crew.username %} & {{ e.crew.username }} {% endif %}
+            </span>
+            <span class="text-muted">⇅</span>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <button class="btn btn-success">Save Results</button>
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+<script>
+const list = document.getElementById("finish-order");
+
+function renumber() {
+    list.querySelectorAll("li").forEach((li, index) => {
+        const num = li.querySelector(".pos-number");
+        if (num) {
+            num.textContent = (index + 1) + ".";
+        }
+    });
+}
+
+Sortable.create(list, {
+    animation: 150,
+    onEnd: renumber,
+});
+
+renumber();
+
+document.getElementById("results-form").addEventListener("submit", function () {
+    const order = [];
+    console.log("Submitting order");
+
+    list.querySelectorAll("li").forEach(li => {
+        order.push(li.dataset.id);
+    });
+
+    order.forEach(id => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "order[]";
+        input.value = id;
+        this.appendChild(input);
+    });
+});
+</script>
+{% endblock %}
+

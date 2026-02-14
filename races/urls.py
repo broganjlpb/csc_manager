@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry
+from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results
 from .views import RegisteredBoatListView, RegisteredBoatCreateView, RegisteredBoatUpdateView,LeagueListView, LeagueCreateView, LeagueUpdateView, RaceEntryListView, RaceCreateView, RaceListView ,add_entry, boat_py
 
 urlpatterns = [
@@ -24,5 +24,7 @@ urlpatterns = [
     
     path("<int:race_pk>/entries/<int:entry_pk>/delete/", delete_entry, name="race-entry-delete"),
     path("<int:race_pk>/entries/<int:entry_pk>/edit/", edit_entry, name="race-entry-edit"),
+
+    path("<int:pk>/results/manual/", manual_results, name="race-results-manual"),
 ]
 

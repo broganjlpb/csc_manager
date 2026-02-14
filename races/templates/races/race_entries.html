@@ -46,6 +46,10 @@
                 <div class="col-md-1">
                     <button id="add-entry-btn" class="btn btn-dark btn-sm w-100">{% if editing_entry %}Save{% else %}Add{% endif %}</button>
                 </div>
+                <a href="{% url 'race-results-manual' race.pk %}"
+                    class="btn btn-sm btn-outline-success">
+                    Enter Manual Results
+                </a>
             </div>
             
         </form>

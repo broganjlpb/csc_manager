@@ -8,6 +8,7 @@ from .forms import BoatTypeForm, RegisteredBoatForm, LeagueForm, RaceEntryForm, 
 from django.utils import timezone
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django import forms
+from django.views.decorators.http import require_http_methods
 
 class BoatTypeListView(ListView):
     model = BoatType
@@ -228,7 +229,7 @@ def edit_entry(request, race_pk, entry_pk):
 
     else:
         form = RaceEntryForm(instance=entry, race=race)
-        
+
     other_entries = race.entries.exclude(pk=entry.pk)
     return render(request, "races/race_entries.html", {
         "race": race,
@@ -239,3 +240,27 @@ def edit_entry(request, race_pk, entry_pk):
         "existing_crew": list(other_entries.values_list("crew_id", flat=True)),
         "existing_boats": list(other_entries.values_list("boat_id", flat=True)),
     })
+
+@require_http_methods(["GET", "POST"])
+def manual_results(request, pk):
+    race = get_object_or_404(Race, pk=pk)
+
+    if request.method == "POST":
+        order = request.POST.getlist("order[]")
+
+        for position, entry_id in enumerate(order, start=1):
+            RaceEntry.objects.filter(pk=entry_id, race=race).update(
+                finish_position=position
+            )
+
+        return redirect("races-list")
+
+    entries = race.entries.select_related("helm", "boat").order_by("finish_position", "id")
+
+
+    return render(request, "races/manual_results.html", {
+        "race": race,
+        "entries": entries,
+    })
+
+
