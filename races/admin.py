@@ -24,7 +24,7 @@ class LeagueAdmin(admin.ModelAdmin):
 
 @admin.register(RaceEntry)
 class RaceEntryAdmin(admin.ModelAdmin):
-    list_display = ("race", "helm", "crew", "boat", "boat_type_name", "py_used", "finish_position",)
+    list_display = ("race", "helm", "crew", "boat", "boat_type_name", "py_used", "finish_position","result_status",)
     search_fields = ("race","finish_position",)
     ordering = ("race","finish_position",)
 

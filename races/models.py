@@ -127,6 +127,17 @@ class RaceEntry(models.Model):
     boat_type_name = models.CharField(max_length=200)
     py_used = models.IntegerField()
     finish_position = models.PositiveIntegerField(null=True, blank=True)
+    class ResultStatus(models.TextChoices):
+        FINISHED = "finished", "Finished"
+        DNF = "dnf", "Did Not Finish"
+        DSQ = "dsq", "Disqualified"
+
+
+    result_status = models.CharField(
+        max_length=20,
+        choices=ResultStatus.choices,
+        default=ResultStatus.FINISHED,
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 

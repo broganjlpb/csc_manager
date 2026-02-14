@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django import forms
 from django.views.decorators.http import require_http_methods
+from django.db.models import F
 
 class BoatTypeListView(ListView):
     model = BoatType
@@ -241,21 +242,41 @@ def edit_entry(request, race_pk, entry_pk):
         "existing_boats": list(other_entries.values_list("boat_id", flat=True)),
     })
 
+def reopen_results(request, pk):
+    race = get_object_or_404(Race, pk=pk)
+    race.status = Race.RaceStatus.OPEN
+    race.save()
+    return redirect("race-results-manual", pk=pk)
+
+
 @require_http_methods(["GET", "POST"])
 def manual_results(request, pk):
     race = get_object_or_404(Race, pk=pk)
 
     if request.method == "POST":
-        order = request.POST.getlist("order[]")
+        print(request.POST)
+        for entry in race.entries.all():
 
-        for position, entry_id in enumerate(order, start=1):
-            RaceEntry.objects.filter(pk=entry_id, race=race).update(
-                finish_position=position
-            )
+            pos = request.POST.get(f"position_{entry.id}")
+            status = request.POST.get(f"status_{entry.id}")
+
+            if status in ["dnf", "dsq"]:
+                entry.result_status = status
+                entry.finish_position = None
+            else:
+                entry.result_status = "finished"
+                entry.finish_position = pos
+
+            entry.save()
+
+        # move race forward
+        race.status = Race.RaceStatus.FINISHED
+        race.save()
 
         return redirect("races-list")
 
-    entries = race.entries.select_related("helm", "boat").order_by("finish_position", "id")
+
+    entries = race.entries.select_related("helm", "boat").order_by(F("finish_position").asc(nulls_last=True),"id")
 
 
     return render(request, "races/manual_results.html", {
