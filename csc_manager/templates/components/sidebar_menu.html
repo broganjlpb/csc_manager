@@ -20,6 +20,12 @@
    href="{% url 'leagues-list' %}">
     Leagues
 </a>
+<div class="sidebar-title">RACES</div>
+<a class="menu-link {% if request.resolver_match.url_name == 'races-list' %}active{% endif %}"
+   href="{% url 'races-list' %}">
+    Races
+</a>
+
 <div class="sidebar-title">ADMINISTRATORS ONLY</div>
 <a class="menu-link {% if request.resolver_match.url_name == 'admin' %}active{% endif %}"
    href="/admin">

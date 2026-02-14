@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.db.models import Q
+from django.http import JsonResponse
 
 from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect
@@ -153,3 +154,12 @@ def resend_verification_email(request):
         "members/resend_verification.html",
         {"form": form},
     )
+
+def default_boat(request, pk):
+    member = Member.objects.filter(pk=pk).select_related("default_boat").first()
+
+    if member and member.default_boat:
+        return JsonResponse({"boat_id": member.default_boat.id})
+
+    return JsonResponse({"boat_id": None})
+

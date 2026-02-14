@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="mb-3">
+    Entries – {{ race }}
+</h3>
+
+{% if editing_entry %}
+<div class="alert alert-info">
+    Editing entry for <strong>{{ editing_entry.helm }}</strong>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-body">
+        
+        <form method="post"
+            action="{% if editing_entry %}
+                        {% url 'race-entry-edit' race.pk editing_entry.pk %}
+                    {% else %}
+                        {% url 'race-entry-add' race.pk %}
+                    {% endif %}">
+            {% csrf_token %}
+            {% if form.errors %}
+                <div class="alert alert-danger">
+                    {{ form.errors }}
+                </div>
+            {% endif %}
+            <div class="row g-2 mb-1 fw-semibold small text-muted">
+                <div class="col-md-3">Helm</div>
+                <div class="col-md-3">Crew</div>
+                <div class="col-md-3">Boat</div>
+                <div class="col-md-2">PY</div>
+                <div class="col-md-1"></div>
+            </div>
+
+            <div class="row g-2">
+                
+                <div class="col-md-3" >{{ form.helm }}</div>
+                <div class="col-md-3" >{{ form.crew }}</div>
+                <div class="col-md-3" >{{ form.boat }}</div>
+                <div class="col-md-2" >{{ form.py_used }}</div>
+                <div id="entry-warning" class="text-danger small mt-2 d-none"></div>
+                <hr>
+                <div class="col-md-1">
+                    <button id="add-entry-btn" class="btn btn-dark btn-sm w-100">{% if editing_entry %}Save{% else %}Add{% endif %}</button>
+                </div>
+            </div>
+            
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Sail</th>
+                    <th>Helm</th>
+                    <th>Crew</th>
+                    <th>PY</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            
+
+            {% for e in entries %}
+                <tr>
+                    <td>{{ e.boat }}</td>
+                    <td>{{ e.helm.username }}</td>
+                    <td>{{ e.crew.username|default:"—" }}</td>
+                    <td>{{ e.py_used }}</td>
+                    <td class="text-end">
+                        <a href="{% url 'race-entry-edit' race.pk e.pk %}"
+                        class="btn btn-sm btn-outline-secondary">
+                            Edit
+                        </a>
+
+                        <a href="{% url 'race-entry-delete' race.pk e.pk %}"
+                        class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Remove this entry?');">
+                            Remove
+                        </a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="4" class="text-muted text-center">
+                        No entries yet
+                    </td>
+                </tr>
+            {% endfor %}
+
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ existing_helms|json_script:"existing-helms" }}
+{{ existing_crew|json_script:"existing-crew" }}
+{{ existing_boats|json_script:"existing-boats" }}
+<script>
+
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const helmSelect = document.querySelector("[name='helm']");
+    const boatSelect = document.querySelector("[name='boat']");
+    const crewSelect = document.querySelector("[name='crew']");
+    const pyInput = document.querySelector("[name='py_used']");
+    const existingHelms = JSON.parse(
+        document.getElementById("existing-helms").textContent
+    );
+    const existingCrew = JSON.parse(
+        document.getElementById("existing-crew").textContent
+    );
+
+    const existingBoats = JSON.parse(
+        document.getElementById("existing-boats").textContent
+    );
+        
+
+    console.log("JS ready");
+
+    const warningBox = document.getElementById("entry-warning");
+    const addBtn = document.getElementById("add-entry-btn");
+
+
+    function validateEntry() {
+        clearWarning();
+
+        const helm = parseInt(helmSelect?.value);
+        const crew = parseInt(crewSelect?.value);
+        const boat = parseInt(boatSelect?.value);
+
+        // no selection yet → fine
+        if (!helm && !crew && !boat) return;
+
+        // same person both roles
+        if (helm && crew && helm === crew) {
+            showWarning("Helm and crew cannot be the same person.", helmSelect);
+            return;
+        }
+
+        // helm already sailing?
+        if (helm && (existingHelms.includes(helm) || existingCrew.includes(helm))) {
+            showWarning("This helm is already sailing in the race.", helmSelect);
+            return;
+        }
+
+        // crew already sailing?
+        if (crew && (existingHelms.includes(crew) || existingCrew.includes(crew))) {
+            showWarning("This crew is already sailing in the race.", crewSelect);
+            return;
+        }
+
+        // boat already used?
+        if (boat && existingBoats.includes(boat)) {
+            showWarning("This boat is already entered in the race.", boatSelect);
+            return;
+        }
+    }
+
+
+    function showWarning(message, field) {
+        warningBox.textContent = message;
+        warningBox.classList.remove("d-none");
+
+        if (field) field.classList.add("is-invalid");
+
+        if (addBtn) addBtn.disabled = true;
+    }
+
+    function clearWarning() {
+        warningBox.textContent = "";
+        warningBox.classList.add("d-none");
+
+        helmSelect.classList.remove("is-invalid");
+        if (crewSelect) crewSelect.classList.remove("is-invalid");
+        boatSelect.classList.remove("is-invalid");
+
+        if (addBtn) addBtn.disabled = false;
+    }
+
+
+    if (boatSelect) {
+        boatSelect.addEventListener("change", function () {
+            const boatId = this.value;
+            if (!boatId) return;
+
+            console.log("Fetching PY for boat", boatId);
+
+            fetch(`/races/api/boat/${boatId}/py/`)
+                .then(r => r.json())
+                .then(data => {
+                    pyInput.value = data.py;
+                });
+        });
+    }
+
+    if (helmSelect) {
+        helmSelect.addEventListener("change", function () {
+            const memberId = this.value;
+            if (!memberId) return;
+
+            console.log("Fetching default boat for member", memberId);
+
+            fetch(`/members/api/member/${memberId}/default-boat/`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.boat_id) {
+                        boatSelect.value = data.boat_id;
+                        boatSelect.dispatchEvent(new Event("change"));
+                    }
+                });
+        });
+    }
+
+    
+
+    if (helmSelect) {
+        helmSelect.addEventListener("change", function () {
+            validateEntry();
+        });
+    }
+
+    if (crewSelect) {
+        crewSelect.addEventListener("change", function () {
+            validateEntry();
+        });
+    }
+
+    if (boatSelect) {
+        boatSelect.addEventListener("change", function () {
+            validateEntry();
+        });
+    }
+
+
+
+});
+</script>
+{% endblock %}
+

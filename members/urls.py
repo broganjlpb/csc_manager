@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import MemberLoginView,  MemberListView, MemberCreateView, MemberUpdateView, PermissionDashboardView,verify_email, index,  resend_verification_email
+from .views import MemberLoginView,  MemberListView, MemberCreateView, MemberUpdateView, PermissionDashboardView,verify_email, index,  resend_verification_email, default_boat
 from django.contrib.auth import views as auth_views
 from members.forms import EmailOrAliasAuthenticationForm
 
@@ -19,4 +19,5 @@ urlpatterns = [
     path("reset/done/",auth_views.PasswordResetCompleteView.as_view(),name="password_reset_complete",),
 
     path("permissions/", PermissionDashboardView.as_view(), name="permission-dashboard"),
+    path("api/member/<int:pk>/default-boat/", default_boat, name="member-default-boat"),
 ]

@@ -1,9 +1,13 @@
-from django.urls import reverse_lazy
-from django.views.generic import CreateView, UpdateView, ListView
-from .models import BoatType, RegisteredBoat, League
-from .forms import BoatTypeForm, RegisteredBoatForm, LeagueForm
+from django.urls import reverse_lazy, reverse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.http import JsonResponse
+from django.views.generic import CreateView, UpdateView, ListView, DetailView, FormView
+from .models import BoatType, RegisteredBoat, League, Race, RaceEntry, RaceResult, Event
+from members.models import Member
+from .forms import BoatTypeForm, RegisteredBoatForm, LeagueForm, RaceEntryForm, RaceEntry, RaceCreateForm
 from django.utils import timezone
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django import forms
 
 class BoatTypeListView(ListView):
     model = BoatType
@@ -117,3 +121,121 @@ class LeagueUpdateView(PermissionRequiredMixin, UpdateView):
         context["submit_text"] = "Save changes"
         context["cancel_url"] = reverse_lazy("leagues-list")
         return context
+    
+class RaceEntryListView(DetailView):
+    model = Race
+    template_name = "races/race_entries.html"
+    context_object_name = "race"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["entries"] = self.object.entries.select_related("helm", "crew", "boat")
+        context["form"] = RaceEntryForm(race=self.object)
+
+        context["existing_helms"] = list(
+            self.object.entries.values_list("helm_id", flat=True)
+        )
+        context["existing_crew"] = list(
+            self.object.entries.values_list("crew_id", flat=True)
+        )
+
+        context["existing_boats"] = list(
+            self.object.entries.values_list("boat_id", flat=True)
+        )
+
+        return context
+
+class RaceCreateView(FormView):
+    template_name = "forms/form_page.html"
+    form_class = RaceCreateForm
+
+    def form_valid(self, form):
+        event = Event.objects.create(
+            start_datetime=form.cleaned_data["start_datetime"],
+            type=Event.EventType.RACE,
+            created_by=self.request.user,
+        )
+
+        race = Race.objects.create(
+            event=event,
+            league=form.cleaned_data["league"],
+            race_officer=form.cleaned_data["race_officer"],
+            assistant_race_officer=form.cleaned_data["assistant_race_officer"],
+        )
+
+        return redirect("race-entries", pk=race.pk)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["title"] = "Create Race"
+        context["submit_text"] = "Create"
+        context["cancel_url"] = reverse("races-list")
+        return context
+
+class RaceListView(ListView):
+    model = Race
+    template_name = "races/race_list.html"
+    context_object_name = "races"
+    ordering = ["-event__start_datetime"]
+
+def add_entry(request, pk):
+    race = get_object_or_404(Race, pk=pk)
+
+    if request.method == "POST":
+        form = RaceEntryForm(request.POST, race=race)
+
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.race = race
+
+            entry.boat_type_name = entry.boat.boat_type.name
+            if not entry.py_used:
+                entry.py_used = entry.boat.boat_type.py
+
+            entry.save()
+            return redirect("race-entries", pk=pk)
+
+    else:
+        form = RaceEntryForm(race=race)
+
+    return render(request, "races/race_entries.html", {
+        "race": race,
+        "form": form,
+        "entries": race.entries.select_related("helm", "crew", "boat"),
+    })
+
+
+def boat_py(request, pk):
+
+    boat = RegisteredBoat.objects.select_related("boat_type").get(pk=pk)
+    return JsonResponse({"py": boat.boat_type.py})
+
+def delete_entry(request, race_pk, entry_pk):
+    entry = get_object_or_404(RaceEntry, pk=entry_pk, race_id=race_pk)
+    entry.delete()
+    return redirect("race-entries", pk=race_pk)
+
+def edit_entry(request, race_pk, entry_pk):
+    race = get_object_or_404(Race, pk=race_pk)
+    entry = get_object_or_404(RaceEntry, pk=entry_pk, race=race)
+
+    if request.method == "POST":
+        form = RaceEntryForm(request.POST, instance=entry, race=race)
+
+        if form.is_valid():
+            form.save()
+            return redirect("race-entries", pk=race_pk)
+
+    else:
+        form = RaceEntryForm(instance=entry, race=race)
+        
+    other_entries = race.entries.exclude(pk=entry.pk)
+    return render(request, "races/race_entries.html", {
+        "race": race,
+        "form": form,
+        "entries": race.entries.select_related("helm", "crew", "boat"),
+        "editing_entry": entry,
+        "existing_helms": list(other_entries.values_list("helm_id", flat=True)),
+        "existing_crew": list(other_entries.values_list("crew_id", flat=True)),
+        "existing_boats": list(other_entries.values_list("boat_id", flat=True)),
+    })
