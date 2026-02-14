@@ -55,6 +55,11 @@
                     <td>{{ league.date_to }}</td>
                     
                     <td class="text-end">
+                        <a href="{% url 'league-table' league.pk %}"
+                            class="btn btn-sm btn-outline-success">
+                            Standings
+                        </a>
+
                         {% if perms.races.change_league %}
                             <a href="{% url 'leagues-edit' league.pk %}"
                             class="btn btn-sm btn-outline-primary">

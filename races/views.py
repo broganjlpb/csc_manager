@@ -11,6 +11,7 @@ from django import forms
 from django.views.decorators.http import require_http_methods
 from django.db.models import F
 from .services import calculate_points
+from .services import calculate_league_table
 
 
 class BoatTypeListView(ListView):
@@ -250,7 +251,6 @@ def reopen_results(request, pk):
     race.save()
     return redirect("race-results-manual", pk=pk)
 
-
 @require_http_methods(["GET", "POST"])
 def manual_results(request, pk):
     race = get_object_or_404(Race, pk=pk)
@@ -288,4 +288,13 @@ def manual_results(request, pk):
         "entries": entries,
     })
 
+def league_table(request, pk):
+    league = get_object_or_404(League, pk=pk)
+
+    table = calculate_league_table(league)
+
+    return render(request, "races/league_table.html", {
+        "league": league,
+        "table": table,
+    })
 

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3>{{ league.name }} – Standings</h3>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Sailor</th>
+            <th>Races</th>
+            <th>Counted</th>
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+
+    {% for row in table %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ row.sailor.get_short_name }}</td>
+            <td>{{ row.sailed }}</td>
+            <td>{{ row.counted }}</td>
+            <td><strong>{{ row.total }}</strong></td>
+        </tr>
+    {% empty %}
+        <tr>
+            <td colspan="5" class="text-center text-muted">
+                No results yet
+            </td>
+        </tr>
+    {% endfor %}
+
+    </tbody>
+</table>
+
+{% endblock %}
