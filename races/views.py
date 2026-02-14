@@ -10,6 +10,8 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django import forms
 from django.views.decorators.http import require_http_methods
 from django.db.models import F
+from .services import calculate_points
+
 
 class BoatTypeListView(ListView):
     model = BoatType
@@ -273,11 +275,13 @@ def manual_results(request, pk):
         race.status = Race.RaceStatus.FINISHED
         race.save()
 
-        return redirect("races-list")
+        # return redirect("races-list")
+        return redirect("race-results-manual", pk=race.pk)
 
 
     entries = race.entries.select_related("helm", "boat").order_by(F("finish_position").asc(nulls_last=True),"id")
-
+    for e in entries:
+        e.points = calculate_points(e.finish_position)
 
     return render(request, "races/manual_results.html", {
         "race": race,

@@ -18,9 +18,16 @@
             data-id="{{ e.id }}">
 
             <div>
+                {% if race.status == race.RaceStatus.FINISHED %}
+                    <span class="badge bg-secondary ms-2">
+                        {{ e.points }} pts
+                    </span>
+                {% endif %}
                 <strong class="pos-number">{{ forloop.counter }}.</strong>
                 {{ e.boat }} – {{ e.helm.username }}
                 {% if e.crew %} & {{ e.crew.username }}{% endif %}
+                
+
             </div>
 
             <div class="d-flex gap-2 align-items-center">
