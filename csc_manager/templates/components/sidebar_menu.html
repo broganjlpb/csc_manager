@@ -1,6 +1,6 @@
 <div class="sidebar-title">Menu</div>
-<a class="menu-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}"
-   href="{% url 'index' %}">
+<a class="menu-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+   href="{% url 'dashboard' %}">
     Dashboard
 </a>
 <a class="menu-link {% if request.resolver_match.url_name == 'member-list' %}active{% endif %}"

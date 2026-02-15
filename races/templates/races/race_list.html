@@ -9,6 +9,35 @@
         Create Race
     </a>
 </div>
+<form method="get" class="row g-2 mb-3">
+
+    <div class="col-md-4">
+        <select name="league" class="form-select" onchange="this.form.submit()">
+            <option value="all">All leagues</option>
+            {% for l in leagues %}
+                <option value="{{ l.id }}"
+                    {% if selected_league == l.id|stringformat:"s" %}selected{% endif %}>
+                    {{ l.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <select name="status" class="form-select" onchange="this.form.submit()">
+            <option value="all">All statuses</option>
+
+            {% for value, label in races.model.RaceStatus.choices %}
+                <option value="{{ value }}"
+                    {% if selected_status == value %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+</form>
+
 
 
 <div class="card">

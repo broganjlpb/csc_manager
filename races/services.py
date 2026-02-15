@@ -13,6 +13,7 @@ def calculate_points(position, max_points=14):
     return max(points, 0)
 
 def calculate_league_table(league):
+
     """
     Returns sorted standings for a league.
     """
@@ -64,3 +65,29 @@ def calculate_league_table(league):
     standings.sort(key=lambda x: x["total"], reverse=True)
 
     return standings
+
+
+
+# Corrected = (Elapsed × 1000 / PY) × (max_laps / boat_laps)
+def corrected_time(elapsed_seconds, py, laps, max_laps):
+    if not elapsed_seconds or not py or not laps:
+        return None
+
+    base = (elapsed_seconds * 1000) / py
+    lap_factor = max_laps / laps
+
+    return base * lap_factor
+
+
+def format_seconds(total):
+    if total is None:
+        return ""
+
+    total = int(total)
+    h = total // 3600
+    m = (total % 3600) // 60
+    s = total % 60
+
+    # if h:
+    #     return f"{h}:{m:02}:{s:02}"
+    return f"{h:02}:{m}:{s:02}"

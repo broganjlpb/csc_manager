@@ -9,9 +9,11 @@ from django.utils import timezone
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django import forms
 from django.views.decorators.http import require_http_methods
-from django.db.models import F
-from .services import calculate_points
-from .services import calculate_league_table
+from django.db.models import F, Count, Q
+from .services import calculate_points, corrected_time
+from .services import calculate_league_table, format_seconds
+from django.utils.timezone import now
+from django.contrib import messages
 
 
 class BoatTypeListView(ListView):
@@ -177,11 +179,36 @@ class RaceCreateView(FormView):
         context["cancel_url"] = reverse("races-list")
         return context
 
+# -event__start_datetime
 class RaceListView(ListView):
     model = Race
     template_name = "races/race_list.html"
     context_object_name = "races"
     ordering = ["-event__start_datetime"]
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related("league")
+
+        league_id = self.request.GET.get("league")
+        status = self.request.GET.get("status")
+
+        if league_id and league_id != "all":
+            qs = qs.filter(league_id=league_id)
+
+        if status and status != "all":
+            qs = qs.filter(status=status)
+
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context["leagues"] = League.objects.order_by("name")
+        context["selected_league"] = self.request.GET.get("league", "all")
+        context["selected_status"] = self.request.GET.get("status", "all")
+
+        return context
+
 
 def add_entry(request, pk):
     race = get_object_or_404(Race, pk=pk)
@@ -298,3 +325,212 @@ def league_table(request, pk):
         "table": table,
     })
 
+def active_leagues(request):
+    today = now().date()
+
+    leagues = (
+        League.objects
+        .filter(date_from__lte=today, date_to__gte=today)
+        .annotate(
+            draft_count=Count("races", filter=Q(races__status="draft")),
+            open_count=Count("races", filter=Q(races__status="open")),
+            running_count=Count("races", filter=Q(races__status="running")),
+            finished_count=Count("races", filter=Q(races__status="finished")),
+            verified_count=Count("races", filter=Q(races__status="verified")),
+            locked_count=Count("races", filter=Q(races__status="locked")),
+        )
+        .order_by("date_to")
+    )
+
+    return render(request, "races/active_leagues.html", {
+        "leagues": leagues,
+    })
+
+def timed_results(request, pk):
+    race = get_object_or_404(Race, pk=pk)
+    entries = race.entries.select_related("boat", "helm")
+
+    preview = None
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        # print("ACTION:", request.POST.get("action"))
+        # print("RACE STATUS: ", race.status )
+
+        # print("------ CHECKING POST ENTRIES ------")
+        # for e in entries:
+        #     print(
+        #         "Entry", e.id,
+        #         "elapsed:", e.elapsed_seconds,
+        #         "laps:", e.laps,
+        #         "status:", e.result_status
+        #     )
+
+        # 🚨 protection against overwrite
+        if race.status in [
+            Race.RaceStatus.FINISHED,
+            Race.RaceStatus.VERIFIED,
+            Race.RaceStatus.LOCKED,
+        ] and action in ["preview", "confirm"]:
+            messages.error(request, "Results already exist. Use Edit to modify.")
+            return redirect("race-results-timed", pk=race.pk)
+
+        # ✅ Always save entered values
+        for e in entries:
+            laps = request.POST.get(f"laps_{e.id}")
+
+            h = request.POST.get(f"h_{e.id}") or 0
+            m = request.POST.get(f"m_{e.id}") or 0
+            s = request.POST.get(f"s_{e.id}") or 0
+
+            total = int(h) * 3600 + int(m) * 60 + int(s)
+
+            e.laps = int(laps) if laps else None
+            e.elapsed_seconds = total if total > 0 else None
+
+            status = request.POST.get(f"status_{e.id}")
+            if status:
+                e.result_status = status
+            else:
+                e.result_status = RaceEntry.ResultStatus.FINISHED
+
+            e.save()
+
+
+        # 🔹 SAVE ONLY
+        if action == "save":
+            messages.success(request, "Times saved.")
+            return redirect("race-results-timed", pk=race.pk)
+
+        # 🔹 PREVIEW
+        if action == "preview":
+            
+            valid = [
+                e for e in entries
+                if e.elapsed_seconds and e.laps and e.result_status in [None, "", "finished"]
+                # if e.elapsed_seconds and e.laps and e.result_status not in ["dnf", "dsq"]
+            ]
+
+            print("VALID: " , valid)
+
+            if valid:
+                max_laps = max(e.laps for e in valid)
+
+                ranked = sorted(
+                    valid,
+                    key=lambda x: corrected_time(
+                        x.elapsed_seconds,
+                        x.py_used,
+                        x.laps,
+                        max_laps
+                    )
+                )
+
+                preview = []
+
+                last_time = None
+                position = 0
+
+                for index, e in enumerate(ranked, start=1):
+                    ct = corrected_time(
+                        e.elapsed_seconds,
+                        e.py_used,
+                        e.laps,
+                        max_laps
+                    )
+
+                    if last_time is None:
+                        position = 1
+                    elif ct > last_time:
+                        position = index
+                    # else → same position
+
+                    preview.append({
+                        "entry": e,
+                        "position": position,
+                        "corrected": format_seconds(ct),
+                    })
+
+                    last_time = ct
+
+        # 🔹 CONFIRM
+        if action == "confirm":
+            valid = [
+                e for e in entries
+                if e.elapsed_seconds and e.laps and e.result_status not in ["dnf", "dsq"]
+            ]
+
+            if valid:
+                max_laps = max(e.laps for e in valid)
+
+                ranked = sorted(
+                    valid,
+                    key=lambda x: corrected_time(
+                        x.elapsed_seconds,
+                        x.py_used,
+                        x.laps,
+                        max_laps
+                    )
+                )
+
+                for pos, e in enumerate(ranked, start=1):
+                    e.finish_position = pos
+                    e.save()
+
+            race.status = Race.RaceStatus.FINISHED
+            race.save()
+
+            messages.success(request, "Results confirmed.")
+            return redirect("race-results-timed", pk=race.pk)
+
+
+
+    for e in entries:
+        if e.elapsed_seconds:
+            e.h = e.elapsed_seconds // 3600
+            e.m = (e.elapsed_seconds % 3600) // 60
+            e.s = e.elapsed_seconds % 60
+        else:
+            e.h = e.m = e.s = ""
+    
+    if race.status == Race.RaceStatus.FINISHED:
+        valid = [
+            e for e in entries
+            if e.elapsed_seconds and e.laps and e.result_status not in ["dnf", "dsq"]
+        ]
+
+        if valid:
+            max_laps = max(e.laps for e in valid)
+
+            preview = []
+
+            for e in valid:
+                preview.append({
+                    "entry": e,
+                    "position": e.finish_position,
+                    "corrected": format_seconds(
+                        corrected_time(
+                            e.elapsed_seconds,
+                            e.py_used,
+                            e.laps,
+                            max_laps
+                        )
+                    )
+                })
+
+    return render(request, "races/timed_results.html", {
+        "race": race,
+        "entries": entries,
+        "preview": preview,
+    })
+
+def timed_results_edit(request, pk):
+    race = get_object_or_404(Race, pk=pk)
+
+    race.status = Race.RaceStatus.OPEN
+    race.save()
+
+    messages.warning(request, "Race reopened for editing.")
+
+    return redirect("race-results-timed", pk=race.pk)

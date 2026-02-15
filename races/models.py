@@ -127,6 +127,10 @@ class RaceEntry(models.Model):
     boat_type_name = models.CharField(max_length=200)
     py_used = models.IntegerField()
     finish_position = models.PositiveIntegerField(null=True, blank=True)
+
+    laps = models.PositiveIntegerField(null=True, blank=True)
+    elapsed_seconds = models.PositiveIntegerField(null=True, blank=True)
+
     class ResultStatus(models.TextChoices):
         FINISHED = "finished", "Finished"
         DNF = "dnf", "Did Not Finish"

@@ -1,8 +1,10 @@
 from django.urls import path
-from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results, reopen_results, league_table
+from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results, reopen_results, league_table, active_leagues, timed_results, timed_results_edit
 from .views import RegisteredBoatListView, RegisteredBoatCreateView, RegisteredBoatUpdateView,LeagueListView, LeagueCreateView, LeagueUpdateView, RaceEntryListView, RaceCreateView, RaceListView ,add_entry, boat_py
 
 urlpatterns = [
+    path("dashboard", active_leagues, name="dashboard"),
+    
     path("boat-types/", BoatTypeListView.as_view(), name="boattype-list"),
     path("boat-types/add/", BoatTypeCreateView.as_view(), name="boattype-add"),
     path("boat-types/<int:pk>/edit/", BoatTypeUpdateView.as_view(), name="boattype-edit"),
@@ -29,5 +31,9 @@ urlpatterns = [
     path("<int:pk>/results/edit/", reopen_results, name="race-results-edit"),
 
     path("leagues/<int:pk>/table/", league_table, name="league-table"),
+    path("leagues/active/", active_leagues, name="active-leagues"),
+
+    path("<int:pk>/results/timed/", timed_results, name="race-results-timed"),
+    path("<int:pk>/results/timed/edit/", timed_results_edit, name="race-results-timed-edit"),
 ]
 

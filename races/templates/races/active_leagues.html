@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3>Active Leagues</h3>
+
+<div class="row">
+
+{% for league in leagues %}
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+
+                <h5>{{ league.name }}</h5>
+
+                <div class="text-muted small mb-2">
+                    {{ league.date_from }} → {{ league.date_to }}
+                </div>
+                <div class="small mt-2">
+
+                    
+                    {% if league.draft_count %}
+                        <a href="{% url 'races-list' %}?league={{ league.id }}&status=draft"
+                            class="badge bg-secondary text-decoration-none">
+                            Draft {{ league.draft_count }}
+                        </a>
+                    {% endif %}
+                    {% if league.open_count %}
+                        <a href="{% url 'races-list' %}?league={{ league.id }}&status=open"
+                            class="badge bg-info text-decoration-none">
+                            Open {{ league.open_count }}
+                        </a>
+                    {% endif %}
+                    {% if league.running_count %}
+                        <a href="{% url 'races-list' %}?league={{ league.id }}&status=running"
+                            class="badge bg-warning text-decoration-none">
+                            Running {{ league.running_count }}
+                        </a>
+                    {% endif %}
+                    {% if league.finished_count %}
+                        <a href="{% url 'races-list' %}?league={{ league.id }}&status=finished"
+                            class="badge bg-success text-decoration-none">
+                            Finished {{ league.finished_count }}
+                        </a>
+                    {% endif %}
+                    {% if league.verified_count %}
+                        <a href="{% url 'races-list' %}?league={{ league.id }}&status=verified"
+                            class="badge bg-dark text-decoration-none">
+                            Verified {{ league.verified_count }}
+                        </a>
+                    {% endif %}
+                      {% if league.locked_count %}
+                        <a href="{% url 'races-list' %}?league={{ league.id }}&status=locked"
+                            class="badge bg-danger text-decoration-none">
+                            Locked {{ league.locked_count }}
+                        </a>
+                    {% endif %}
+
+                </div>
+                <hr>
+
+
+                <a href="{% url 'league-table' league.pk %}"
+                   class="btn btn-primary btn-sm">
+                    View Standings
+                </a>
+                <a href="{% url 'races-list' %}?league={{ league.id }}"
+                    class="btn btn-outline-secondary btn-sm">
+                    View Races
+                </a>
+
+            </div>
+        </div>
+    </div>
+{% empty %}
+    <div class="text-muted">
+        No active leagues today.
+    </div>
+{% endfor %}
+
+</div>
+
+{% endblock %}

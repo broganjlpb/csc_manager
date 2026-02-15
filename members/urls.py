@@ -1,11 +1,12 @@
 from django.urls import path
 from . import views
 from .views import MemberLoginView,  MemberListView, MemberCreateView, MemberUpdateView, PermissionDashboardView,verify_email, index,  resend_verification_email, default_boat
+from races.views import active_leagues
 from django.contrib.auth import views as auth_views
 from members.forms import EmailOrAliasAuthenticationForm
 
 urlpatterns = [
-    path('',views.index, name='index'),
+    # path('',views.index, name='index'),
     path("members/", MemberListView.as_view(), name="member-list"),
     path("members/add/", MemberCreateView.as_view(), name="member-add"),
     path("members/<int:pk>/edit/", MemberUpdateView.as_view(), name="member-edit"),
