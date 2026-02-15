@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results, reopen_results, league_table, active_leagues, timed_results, timed_results_edit
+from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results, reopen_results, league_table, active_leagues, timed_results, timed_results_edit, race_timer
 from .views import RegisteredBoatListView, RegisteredBoatCreateView, RegisteredBoatUpdateView,LeagueListView, LeagueCreateView, LeagueUpdateView, RaceEntryListView, RaceCreateView, RaceListView ,add_entry, boat_py
 
 urlpatterns = [
@@ -35,5 +35,8 @@ urlpatterns = [
 
     path("<int:pk>/results/timed/", timed_results, name="race-results-timed"),
     path("<int:pk>/results/timed/edit/", timed_results_edit, name="race-results-timed-edit"),
+
+    path("<int:pk>/timer/", race_timer, name="race-timer"),
+
 ]
 

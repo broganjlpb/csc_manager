@@ -2,8 +2,8 @@
 {% block content %}
 
 <h3>Timed Results – {{ race }}</h3>
-{{ race.status }}
-PREVIEW = {{ preview|default:"NONE" }}
+<!-- {{ race.status }}
+PREVIEW = {{ preview|default:"NONE" }} -->
 
 <form method="post" id="timed-form">
 {% csrf_token %}

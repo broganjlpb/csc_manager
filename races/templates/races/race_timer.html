@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block content %}
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+<h2>Race Timer – {{ race }}</h2>
+
+<!-- <div class="display-4 mb-3" id="clock">00:00</div> -->
+
+<div id="start-controls" class="d-flex gap-2 mb-3">
+    <button id="btn-5" class="btn btn-primary">5 min</button>
+    <button id="btn-3" class="btn btn-primary">3 min</button>
+    <button id="btn-1" class="btn btn-primary">1 min</button>
+    <button id="btn-now" class="btn btn-danger">Immediate</button>
+</div>
+
+<button id="restart-btn" class="btn btn-warning mb-3 d-none">
+    Restart
+</button>
+
+
+<h2 id="clock" class="display-5 fw-bold">00:00</h2>
+
+
+<div class="row">
+{% for e in entries %}
+    <div class="col-6 mb-2">
+        <div class="card mb-2">
+    <div class="card-body p-2">
+
+        <button class="btn btn-lg btn-primary w-100 lap-btn mb-2"
+                data-id="{{ e.id }}">
+
+            <div class="fw-bold fs-4">
+                {{ e.boat.sail_number }}
+            </div>
+
+            <div style="font-size: 0.7rem;">
+                {{ e.boat.boat_type.name }}<br>
+                Helm: {{ e.helm.get_short_name }}
+            </div>
+
+            <div class="mt-1 small">
+                Lap: <span class="lap-count">0</span> |
+                Last: <span class="last-time">--</span>
+            </div>
+
+        </button>
+
+        <button class="btn btn-sm btn-outline-secondary w-100 undo-btn"
+                data-id="{{ e.id }}">
+            Undo Last Lap
+        </button>
+
+    </div>
+    </div>
+    </div>
+{% endfor %}
+</div>
+
+<button class="btn btn-dark mt-3" id="finish-btn">
+    Finish Race
+</button>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    /* =====================================================
+       GLOBAL STATE
+    ===================================================== */
+    const clock = document.getElementById("clock");
+    const startControls = document.getElementById("start-controls");
+    const restartBtn = document.getElementById("restart-btn");
+
+    let startTime = null;
+    let timerInterval = null;
+    let countdownInterval = null;
+
+    // ⭐ MUST EXIST BEFORE ANYTHING ELSE
+    const lapData = {};
+
+    const lapButtons = document.querySelectorAll(".lap-btn");
+
+    function enableLaps(enabled) {
+        lapButtons.forEach(b => b.disabled = !enabled);
+    }
+
+    enableLaps(false);
+
+    /* =====================================================
+       SOUND
+    ===================================================== */
+    function beep() {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+    }
+
+    function longHorn() {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.frequency.value = 200;
+        osc.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.7);
+    }
+
+    /* =====================================================
+       VISUAL FLASH
+    ===================================================== */
+    function flash(color) {
+        document.body.style.background = color;
+        setTimeout(() => document.body.style.background = "", 300);
+    }
+
+    /* =====================================================
+       RACE CLOCK
+    ===================================================== */
+    function startRaceClock() {
+        clearInterval(countdownInterval);
+
+        enableLaps(true);
+        startTime = Date.now();
+
+        timerInterval = setInterval(() => {
+            const diff = Math.floor((Date.now() - startTime) / 1000);
+            const m = Math.floor(diff / 60);
+            const s = diff % 60;
+            clock.textContent = `${m}:${s.toString().padStart(2, "0")}`;
+        }, 1000);
+    }
+
+    /* =====================================================
+       COUNTDOWN
+    ===================================================== */
+    function startCountdown(minutes) {
+
+        if (startTime || countdownInterval) {
+            const ok = confirm("Restart sequence? All times will be lost.");
+            if (!ok) return;
+            resetRace();
+        }
+
+        startControls.classList.add("d-none");
+        restartBtn.classList.remove("d-none");
+
+        let remaining = (minutes * 60) + 10;
+
+        countdownInterval = setInterval(() => {
+
+            remaining--;
+
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+
+            clock.textContent = `Start in ${m}:${s.toString().padStart(2, "0")}`;
+
+            if (remaining === minutes * 60) {
+                longHorn();
+                flash("#0d6efd");
+            }
+
+            if (remaining === 60) {
+                longHorn();
+                flash("#ffc107");
+            }
+
+            if ([3,2,1].includes(remaining)) {
+                beep();
+            }
+
+            if (remaining === 0) {
+                longHorn();
+                flash("#198754");
+                startRaceClock();
+            }
+
+        }, 1000);
+    }
+
+    /* =====================================================
+       BUTTON HOOKS
+    ===================================================== */
+    document.getElementById("btn-5").onclick = () => startCountdown(5);
+    document.getElementById("btn-3").onclick = () => startCountdown(3);
+    document.getElementById("btn-1").onclick = () => startCountdown(1);
+    document.getElementById("btn-now").onclick = () => startCountdown(0);
+
+    restartBtn.onclick = () => {
+        const ok = confirm("Restart race?\n\nAll recorded data will be lost.");
+        if (!ok) return;
+        resetRace();
+    };
+
+    /* =====================================================
+       LAP RECORDING
+    ===================================================== */
+    lapButtons.forEach(btn => {
+        const id = btn.dataset.id;
+
+        lapData[id] = {
+            laps: 0,
+            times: []
+        };
+
+        btn.addEventListener("click", () => {
+            if (!startTime) return;
+
+            const seconds = Math.floor((Date.now() - startTime) / 1000);
+
+            lapData[id].laps += 1;
+            lapData[id].times.push(seconds);
+
+            btn.querySelector(".lap-count").textContent = lapData[id].laps;
+
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            btn.querySelector(".last-time").textContent =
+                `${m}:${s.toString().padStart(2, "0")}`;
+        });
+    });
+
+    /* =====================================================
+       UNDO
+    ===================================================== */
+    document.querySelectorAll(".undo-btn").forEach(btn => {
+        const id = btn.dataset.id;
+
+        btn.addEventListener("click", () => {
+            const data = lapData[id];
+            if (!data || data.laps === 0) return;
+
+            data.laps -= 1;
+            data.times.pop();
+
+            const card = btn.closest(".card");
+            card.querySelector(".lap-count").textContent = data.laps;
+
+            if (data.times.length) {
+                const seconds = data.times[data.times.length - 1];
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                card.querySelector(".last-time").textContent =
+                    `${m}:${s.toString().padStart(2, "0")}`;
+            } else {
+                card.querySelector(".last-time").textContent = "--";
+            }
+        });
+    });
+
+    /* =====================================================
+       FINISH
+    ===================================================== */
+    document.getElementById("finish-btn").onclick = () => {
+        if (!startTime) return;
+
+        clearInterval(timerInterval);
+
+        if (!confirm("Finish race and send results?")) return;
+
+        fetch("", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(lapData)
+        }).then(() => {
+            window.location.href = "../results/timed/";
+        });
+    };
+
+    /* =====================================================
+       RESET
+    ===================================================== */
+    function resetRace() {
+        clearInterval(timerInterval);
+        clearInterval(countdownInterval);
+
+        startTime = null;
+        clock.textContent = "00:00";
+
+        enableLaps(false);
+
+        startControls.classList.remove("d-none");
+        restartBtn.classList.add("d-none");
+
+        Object.keys(lapData).forEach(id => {
+            lapData[id].laps = 0;
+            lapData[id].times = [];
+        });
+
+        document.querySelectorAll(".lap-count").forEach(el => el.textContent = 0);
+        document.querySelectorAll(".last-time").forEach(el => el.textContent = "--");
+    }
+
+});
+</script>
+{% endblock %}

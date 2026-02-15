@@ -14,6 +14,7 @@ from .services import calculate_points, corrected_time
 from .services import calculate_league_table, format_seconds
 from django.utils.timezone import now
 from django.contrib import messages
+import json
 
 
 class BoatTypeListView(ListView):
@@ -534,3 +535,31 @@ def timed_results_edit(request, pk):
     messages.warning(request, "Race reopened for editing.")
 
     return redirect("race-results-timed", pk=race.pk)
+
+def race_timer(request, pk):
+    race = get_object_or_404(Race, pk=pk)
+    entries = race.entries.all()
+
+    if request.method == "POST":
+        data = json.loads(request.body)
+
+        for entry_id, info in data.items():
+            e = entries.get(pk=entry_id)
+
+            e.laps = info["laps"]
+
+            if info["times"]:
+                e.elapsed_seconds = info["times"][-1]
+
+            e.result_status = "finished"
+            e.save()
+
+        return JsonResponse({"ok": True})
+
+    return render(request, "races/race_timer.html", {
+        "race": race,
+        "entries": entries,
+    })
+
+
+
