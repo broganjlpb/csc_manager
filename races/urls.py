@@ -1,6 +1,7 @@
 from django.urls import path
-from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results, reopen_results, league_table, active_leagues, timed_results, timed_results_edit, race_timer, race_event_api
+from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results, reopen_results, league_table, active_leagues, timed_results, timed_results_edit, race_timer, race_event_api, live_race_page
 from .views import RegisteredBoatListView, RegisteredBoatCreateView, RegisteredBoatUpdateView,LeagueListView, LeagueCreateView, LeagueUpdateView, RaceEntryListView, RaceCreateView, RaceListView ,add_entry, boat_py
+from .views_api import live_race_state
 
 urlpatterns = [
     path("dashboard", active_leagues, name="dashboard"),
@@ -40,5 +41,8 @@ urlpatterns = [
 
     path("api/race-event/", race_event_api, name="race_event_api"),
 
+    path("api/race/<int:race_id>/live/", live_race_state),
+    path("<int:race_id>/live/", live_race_page, name="race-live"),
+    path("<int:race_id>/live/state/", live_race_state, name="live_state"),
 ]
 

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from math import ceil
+from races.models import RaceEvent, RaceEntry
 
 
 def calculate_points(position, max_points=14):
@@ -11,6 +12,8 @@ def calculate_points(position, max_points=14):
 
     points = max_points - (position - 1)
     return max(points, 0)
+
+#----------------------------------------------------------#
 
 def calculate_league_table(league):
 
@@ -66,6 +69,8 @@ def calculate_league_table(league):
 
     return standings
 
+#----------------------------------------------------------#
+
 # Corrected = (Elapsed × 1000 / PY) × (max_laps / boat_laps)
 def corrected_time(elapsed_seconds, py, laps, max_laps):
     if not elapsed_seconds or not py or not laps:
@@ -75,6 +80,8 @@ def corrected_time(elapsed_seconds, py, laps, max_laps):
     lap_factor = max_laps / laps
 
     return base * lap_factor
+
+#----------------------------------------------------------#
 
 def format_seconds(total):
     if total is None:
@@ -88,3 +95,111 @@ def format_seconds(total):
     # if h:
     #     return f"{h}:{m:02}:{s:02}"
     return f"{h:02}:{m}:{s:02}"
+
+#----------------------------------------------------------#
+
+def build_race_state(race_id):
+    events = RaceEvent.objects.filter(race_id=race_id).order_by(
+        "device_id", "sequence"
+    )
+
+    state = {
+        "started": False,
+        "finished": False,
+        "race_time": 0,
+        "boats": {}
+    }
+
+####
+    events = list(
+        RaceEvent.objects
+        .filter(race_id=race_id)
+        .order_by("device_id", "sequence")
+    )
+
+    # find index of last restart
+    last_restart_index = -1
+    for i, ev in enumerate(events):
+        if ev.event_type == "restart":
+            last_restart_index = i
+
+    # cut history
+    if last_restart_index >= 0:
+        events = events[last_restart_index + 1:]
+
+
+####
+
+    # initialise boats from DB
+    entries = RaceEntry.objects.filter(race_id=race_id).select_related(
+        "helm", "boat"
+    )
+
+    for e in entries:
+        state["boats"][e.id] = {
+            "entry_id": e.id,
+            "helm": e.helm.get_short_name(),
+            "sail": e.boat.sail_number,
+            "py": float(e.py_used or 0),
+            "laps": 0,
+            "times": [],
+            "last": 0,
+            "corrected": 0,
+            "boat_class": e.boat_type_name
+        }
+
+    # replay events
+    for ev in events:
+
+        if ev.event_type == "start":
+            state["started"] = True
+
+        elif ev.event_type == "lap" and ev.race_entry_id:
+            b = state["boats"][ev.race_entry_id]
+            b["laps"] += 1
+            b["times"].append(ev.race_seconds)
+            b["last"] = ev.race_seconds
+            state["race_time"] = max(state["race_time"], ev.race_seconds or 0)
+
+        elif ev.event_type == "undo" and ev.race_entry_id:
+            b = state["boats"][ev.race_entry_id]
+            if b["laps"] > 0:
+                b["laps"] -= 1
+                b["times"].pop()
+                b["last"] = b["times"][-1] if b["times"] else 0
+
+        elif ev.event_type == "finish":
+            state["finished"] = True
+
+    # -------------------------------------------------
+    # CALCULATE CORRECTED
+    # -------------------------------------------------
+    max_laps = max((b["laps"] for b in state["boats"].values()), default=0)
+
+    for b in state["boats"].values():
+        if b["laps"] > 0 and b["py"]:
+            projected = b["last"] * (max_laps / b["laps"])
+            b["corrected"] = projected * 1000 / b["py"]
+
+    # -------------------------------------------------
+    # POSITIONS
+    # -------------------------------------------------
+    actual = sorted(
+        state["boats"].values(),
+        key=lambda x: (-x["laps"], x["last"])
+    )
+
+    for i, b in enumerate(actual, 1):
+        b["actual_pos"] = i
+
+    corrected = sorted(
+        state["boats"].values(),
+        key=lambda x: x["corrected"] or 999999
+    )
+
+    for i, b in enumerate(corrected, 1):
+        b["corrected_pos"] = i
+
+    return state
+
+

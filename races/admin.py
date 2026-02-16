@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import BoatType, RegisteredBoat, League, RaceEntry,Race,RaceResult
+from .models import BoatType, RegisteredBoat, League, RaceEntry,Race,RaceResult,Event,RaceEvent
 
 # Register your models here.
 
@@ -40,3 +40,14 @@ class RaceResultAdmin(admin.ModelAdmin):
     search_fields = ("entry","position",)
     ordering = ("entry","position",)
 
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
+    list_display = ("start_datetime", "type", "created_by", "created_at", "is_active")
+    search_fields = ("start_datetime", "type")
+    ordering = ("start_datetime",)
+
+@admin.register(RaceEvent)
+class RaceEventAdmin(admin.ModelAdmin):
+    list_display = ("race", "device_id", "sequence", "event_type", "race_entry","created_at")
+    search_fields = ("race", "sequence")
+    ordering = ("race", "sequence")

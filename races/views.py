@@ -2,7 +2,7 @@ from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from django.views.generic import CreateView, UpdateView, ListView, DetailView, FormView
-from .models import BoatType, RegisteredBoat, League, Race, RaceEntry, RaceResult, Event
+from .models import BoatType, RegisteredBoat, League, Race, RaceEntry, RaceResult, Event, Race, RaceEvent
 from members.models import Member
 from .forms import BoatTypeForm, RegisteredBoatForm, LeagueForm, RaceEntryForm, RaceEntry, RaceCreateForm
 from django.utils import timezone
@@ -15,6 +15,10 @@ from .services import calculate_league_table, format_seconds
 from django.utils.timezone import now
 from django.contrib import messages
 import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.db import IntegrityError
+from races.services import build_race_state
 
 
 class BoatTypeListView(ListView):
@@ -351,22 +355,21 @@ def timed_results(request, pk):
     race = get_object_or_404(Race, pk=pk)
     entries = race.entries.select_related("boat", "helm")
 
+    state = build_race_state(race.id)
+
+    # populate RaceEntry from event history
+    for e in entries:
+        b = state["boats"].get(e.id)
+        if not b:
+            continue
+
+        e.laps = b["laps"]
+        e.elapsed_seconds = b["last"]
+
     preview = None
 
     if request.method == "POST":
         action = request.POST.get("action")
-
-        # print("ACTION:", request.POST.get("action"))
-        # print("RACE STATUS: ", race.status )
-
-        # print("------ CHECKING POST ENTRIES ------")
-        # for e in entries:
-        #     print(
-        #         "Entry", e.id,
-        #         "elapsed:", e.elapsed_seconds,
-        #         "laps:", e.laps,
-        #         "status:", e.result_status
-        #     )
 
         # 🚨 protection against overwrite
         if race.status in [
@@ -561,14 +564,6 @@ def race_timer(request, pk):
         "entries": entries,
     })
 
-import json
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.db import IntegrityError
-
-from .models import RaceEvent, RaceEntry
-
-
 @csrf_exempt
 def race_event_api(request):
     if request.method != "POST":
@@ -606,4 +601,6 @@ def race_event_api(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
-
+def live_race_page(request, race_id):
+    race = get_object_or_404(Race, pk=race_id)
+    return render(request, "races/live.html", {"race": race})

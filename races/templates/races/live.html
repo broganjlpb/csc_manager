@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Live Race{% endblock %}
+
+{% block content %}
+<h1>Live Race</h1>
+
+<h2 class="mb-3">{{ race }}</h2>
+
+<div id="race-status" class="alert alert-secondary"></div>
+<div id="race-clock" class="mb-2 fw-bold"></div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Corr</th>
+            <th>Helm</th>
+            <th>Sail</th>
+            <th>Class</th>
+            <th>PY</th>
+            <th>Laps</th>
+            <th>Last</th>
+            <th>Actual</th>
+        </tr>
+    </thead>
+    <tbody id="live-body"></tbody>
+</table>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+const STATE_URL = "{% url 'live_state' race.id %}";
+function fmt(sec){
+    if(sec == null) return "--";
+    const m = Math.floor(sec/60);
+    const s = Math.floor(sec%60);
+    return `${m}:${s.toString().padStart(2,"0")}`;
+}
+
+function load(){
+
+    fetch(STATE_URL)
+    .then(r => {
+        if(!r.ok) throw new Error("bad response");
+        return r.json();
+    })
+    .then(data => {
+
+        // ================================
+        // STATUS
+        // ================================
+        const banner = document.getElementById("race-status");
+        const clock = document.getElementById("race-clock");
+
+        if(!data.started){
+            banner.className = "alert alert-secondary";
+            banner.textContent = "Not started";
+            clock.textContent = "";
+        }
+        else if(data.finished){
+            banner.className = "alert alert-dark";
+            banner.textContent = "Finished";
+            clock.textContent = `Race Time ${fmt(data.race_time)}`;
+        }
+        else{
+            banner.className = "alert alert-success";
+            banner.textContent = "Racing";
+            clock.textContent = `Elapsed ${fmt(data.race_time)}`;
+        }
+
+        // ================================
+        // TABLE
+        // ================================
+        const body = document.getElementById("live-body");
+        body.innerHTML = "";
+
+        const boats = Object.values(data.boats);
+
+        // ⭐ SORT BY CORRECTED POSITION
+        boats.sort((a,b) => a.corrected_pos - b.corrected_pos);
+
+        boats.forEach(b => {
+            body.innerHTML += `
+                <tr>
+                    <td>${b.corrected_pos}</td>
+                    <td>${b.helm}</td>
+                    <td>${b.sail}</td>
+                    <td>${b.boat_class || ""}</td>
+                    <td>${b.py}</td>
+                    <td>${b.laps}</td>
+                    <td>${fmt(b.last)}</td>
+                    <td>${b.actual_pos}</td>
+                </tr>
+            `;
+        });
+
+    })
+    .catch(e => console.log("LIVE LOAD FAIL", e));
+}
+
+load();
+setInterval(load, 2000);
+
+
+</script>
+{% endblock %}
