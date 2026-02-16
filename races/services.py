@@ -66,8 +66,6 @@ def calculate_league_table(league):
 
     return standings
 
-
-
 # Corrected = (Elapsed × 1000 / PY) × (max_laps / boat_laps)
 def corrected_time(elapsed_seconds, py, laps, max_laps):
     if not elapsed_seconds or not py or not laps:
@@ -77,7 +75,6 @@ def corrected_time(elapsed_seconds, py, laps, max_laps):
     lap_factor = max_laps / laps
 
     return base * lap_factor
-
 
 def format_seconds(total):
     if total is None:

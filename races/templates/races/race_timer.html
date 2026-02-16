@@ -1,58 +1,133 @@
 {% extends "base.html" %}
-
 {% block content %}
+
+<style>
+@keyframes blink { 50% { opacity: 0.25; } }
+
+.lap-btn { width: 100%; }
+
+.lap-warning  { border: 4px solid #20c997 !important; }
+.lap-imminent { border: 4px solid #ffc107 !important; animation: blink .7s linear infinite; }
+.lap-late     { border: 4px solid #dc3545 !important; }
+
+.sort-warning {
+    background: #ffc107;
+    color: black;
+    font-weight: bold;
+}
+
+/* sticky header */
+#sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--bs-body-bg);
+    padding: 8px 0;
+    border-bottom: 1px solid #ddd;
+}
+
+/* ⭐ GRID — REQUIRED FOR ANIMATION */
+/* .boat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 150px);
+    gap: 8px;
+} */
+
+.boat-grid {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.boat-tile {
+    width: 150px;
+    transform: translateZ(0);
+}
+
+</style>
+
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
 <h2>Race Timer – {{ race }}</h2>
 
-<!-- <div class="display-4 mb-3" id="clock">00:00</div> -->
+<div id="sticky-header">
 
-<div id="start-controls" class="d-flex gap-2 mb-3">
-    <button id="btn-5" class="btn btn-primary">5 min</button>
-    <button id="btn-3" class="btn btn-primary">3 min</button>
-    <button id="btn-1" class="btn btn-primary">1 min</button>
-    <button id="btn-now" class="btn btn-danger">Immediate</button>
+    <div id="start-controls" class="d-flex gap-2 mb-2">
+        <button id="btn-5" class="btn btn-primary">5 min</button>
+        <button id="btn-3" class="btn btn-primary">3 min</button>
+        <button id="btn-1" class="btn btn-primary">1 min</button>
+        <button id="btn-now" class="btn btn-danger">Immediate</button>
+    </div>
+
+    <button id="restart-btn" class="btn btn-warning mb-2 d-none">
+        Restart
+    </button>
+
+    <h2 id="clock" class="display-6 fw-bold">00:00</h2>
+
+    <div class="mb-2">
+        <button class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="collapse"
+                data-bs-target="#prediction-panel">
+            Predicted Finish
+        </button>
+
+        <button id="sort-advice-btn"
+                class="btn btn-sm btn-outline-secondary ms-2">
+            Sort By Predicted Arrival
+        </button>
+
+        <div id="prediction-panel" class="collapse mt-2">
+            <table class="table table-sm table-borderless small text-muted mb-0">
+                <thead>
+                    <tr>
+                        <th>Pos</th>
+                        <th>Helm</th>
+                        <th>Laps</th>
+                        <th>Last</th>
+                        <th>Next</th>
+                        <th>Corrected</th>
+                    </tr>
+                </thead>
+                <tbody id="prediction-body"></tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
-<button id="restart-btn" class="btn btn-warning mb-3 d-none">
-    Restart
-</button>
-
-
-<h2 id="clock" class="display-5 fw-bold">00:00</h2>
-
-
-<div class="row">
+<!-- BOATS -->
+<div id="boat-grid" class="boat-grid">
 {% for e in entries %}
-    <div class="col-6 mb-2">
-        <div class="card mb-2">
-    <div class="card-body p-2">
+    <div class="boat-tile" data-id="{{ e.id }}">
+        <div class="card">
+            <div class="card-body p-2">
 
-        <button class="btn btn-lg btn-primary w-100 lap-btn mb-2"
-                data-id="{{ e.id }}">
+                <button class="btn btn-lg btn-primary w-100 lap-btn mb-2"
+                        data-id="{{ e.id }}"
+                        data-py="{{ e.py_used|stringformat:'s' }}"
+                        data-helm="{{ e.helm.username }}">
 
-            <div class="fw-bold fs-4">
-                {{ e.boat.sail_number }}
+                    <div class="fw-bold fs-4">
+                        {{ e.boat.sail_number }}
+                    </div>
+
+                    <div style="font-size: 0.7rem;">
+                        {{ e.boat.boat_type.name }}<br>
+                        Helm: {{ e.helm.get_short_name }}
+                    </div>
+
+                    <div class="mt-1 small">
+                        Lap: <span class="lap-count">0</span> |
+                        Last: <span class="last-time">--</span>
+                    </div>
+                </button>
+
+                <button class="btn btn-sm btn-outline-secondary w-100 undo-btn"
+                        data-id="{{ e.id }}">
+                    Undo Last Lap
+                </button>
+
             </div>
-
-            <div style="font-size: 0.7rem;">
-                {{ e.boat.boat_type.name }}<br>
-                Helm: {{ e.helm.get_short_name }}
-            </div>
-
-            <div class="mt-1 small">
-                Lap: <span class="lap-count">0</span> |
-                Last: <span class="last-time">--</span>
-            </div>
-
-        </button>
-
-        <button class="btn btn-sm btn-outline-secondary w-100 undo-btn"
-                data-id="{{ e.id }}">
-            Undo Last Lap
-        </button>
-
-    </div>
-    </div>
+        </div>
     </div>
 {% endfor %}
 </div>
@@ -64,239 +139,252 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-    /* =====================================================
-       GLOBAL STATE
-    ===================================================== */
-    const clock = document.getElementById("clock");
-    const startControls = document.getElementById("start-controls");
-    const restartBtn = document.getElementById("restart-btn");
+const BUNCH_WINDOW = 5;
 
-    let startTime = null;
-    let timerInterval = null;
-    let countdownInterval = null;
+const clock = document.getElementById("clock");
+const startControls = document.getElementById("start-controls");
+const restartBtn = document.getElementById("restart-btn");
+const sortBtn = document.getElementById("sort-advice-btn");
+const grid = document.getElementById("boat-grid");
 
-    // ⭐ MUST EXIST BEFORE ANYTHING ELSE
-    const lapData = {};
+let startTime = null;
+let timerInterval = null;
+let countdownInterval = null;
 
-    const lapButtons = document.querySelectorAll(".lap-btn");
+const lapData = {};
+const lapButtons = document.querySelectorAll(".lap-btn");
+let currentPredictions = [];
 
-    function enableLaps(enabled) {
-        lapButtons.forEach(b => b.disabled = !enabled);
-    }
+/* ⭐ SORTABLE */
+// const sortable = Sortable.create(grid, {
+//     animation: 1000,
+//     sort: false,
+//     draggable: ".boat-tile",
+//     dataIdAttr: "data-id"
+// });
+const sortable = Sortable.create(grid, {
+    animation: 600,
+    easing: "cubic-bezier(0.2, 0, 0, 1)",
+    draggable: ".boat-tile",
+    dataIdAttr: "data-id",
+    forceFallback: true
+});
 
-    enableLaps(false);
 
-    /* =====================================================
-       SOUND
-    ===================================================== */
-    function beep() {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        osc.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.15);
-    }
+// console.log("SORTABLE INIT", sortable);
+// console.log("ITEMS:", sortable.toArray());
+// console.log("SORT TO:", order);
 
-    function longHorn() {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        osc.frequency.value = 200;
-        osc.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.7);
-    }
+/* ===================================================== */
+function enableLaps(enabled) {
+    lapButtons.forEach(b => b.disabled = !enabled);
+}
+enableLaps(false);
 
-    /* =====================================================
-       VISUAL FLASH
-    ===================================================== */
-    function flash(color) {
-        document.body.style.background = color;
-        setTimeout(() => document.body.style.background = "", 300);
-    }
+/* ===================================================== */
+function startRaceClock() {
+    clearInterval(countdownInterval);
+    enableLaps(true);
+    startTime = Date.now();
+}
 
-    /* =====================================================
-       RACE CLOCK
-    ===================================================== */
-    function startRaceClock() {
-        clearInterval(countdownInterval);
+/* ===================================================== */
+function startCountdown(minutes) {
 
-        enableLaps(true);
-        startTime = Date.now();
-
-        timerInterval = setInterval(() => {
-            const diff = Math.floor((Date.now() - startTime) / 1000);
-            const m = Math.floor(diff / 60);
-            const s = diff % 60;
-            clock.textContent = `${m}:${s.toString().padStart(2, "0")}`;
-        }, 1000);
-    }
-
-    /* =====================================================
-       COUNTDOWN
-    ===================================================== */
-    function startCountdown(minutes) {
-
-        if (startTime || countdownInterval) {
-            const ok = confirm("Restart sequence? All times will be lost.");
-            if (!ok) return;
-            resetRace();
-        }
-
-        startControls.classList.add("d-none");
-        restartBtn.classList.remove("d-none");
-
-        let remaining = (minutes * 60) + 10;
-
-        countdownInterval = setInterval(() => {
-
-            remaining--;
-
-            const m = Math.floor(remaining / 60);
-            const s = remaining % 60;
-
-            clock.textContent = `Start in ${m}:${s.toString().padStart(2, "0")}`;
-
-            if (remaining === minutes * 60) {
-                longHorn();
-                flash("#0d6efd");
-            }
-
-            if (remaining === 60) {
-                longHorn();
-                flash("#ffc107");
-            }
-
-            if ([3,2,1].includes(remaining)) {
-                beep();
-            }
-
-            if (remaining === 0) {
-                longHorn();
-                flash("#198754");
-                startRaceClock();
-            }
-
-        }, 1000);
-    }
-
-    /* =====================================================
-       BUTTON HOOKS
-    ===================================================== */
-    document.getElementById("btn-5").onclick = () => startCountdown(5);
-    document.getElementById("btn-3").onclick = () => startCountdown(3);
-    document.getElementById("btn-1").onclick = () => startCountdown(1);
-    document.getElementById("btn-now").onclick = () => startCountdown(0);
-
-    restartBtn.onclick = () => {
-        const ok = confirm("Restart race?\n\nAll recorded data will be lost.");
-        if (!ok) return;
+    if (startTime || countdownInterval) {
+        if (!confirm("Restart sequence? All times will be lost.")) return;
         resetRace();
+    }
+
+    startControls.classList.add("d-none");
+    restartBtn.classList.remove("d-none");
+
+    let remaining = (minutes * 60) + 10;
+
+    countdownInterval = setInterval(() => {
+        remaining--;
+        const m = Math.floor(remaining / 60);
+        const s = remaining % 60;
+        clock.textContent = `Start in ${m}:${s.toString().padStart(2, "0")}`;
+
+        if (remaining === 0) startRaceClock();
+    }, 1000);
+}
+
+/* ===================================================== */
+document.getElementById("btn-5").onclick = () => startCountdown(5);
+document.getElementById("btn-3").onclick = () => startCountdown(3);
+document.getElementById("btn-1").onclick = () => startCountdown(1);
+document.getElementById("btn-now").onclick = () => startCountdown(0);
+
+restartBtn.onclick = () => {
+    if (!confirm("Restart race?")) return;
+    resetRace();
+};
+
+/* ===================================================== */
+/* LAP BUTTONS */
+lapButtons.forEach(btn => {
+    const id = btn.dataset.id;
+
+    lapData[id] = {
+        laps: 0,
+        times: [],
+        py: parseFloat(btn.dataset.py),
+        helm: btn.dataset.helm
     };
 
-    /* =====================================================
-       LAP RECORDING
-    ===================================================== */
-    lapButtons.forEach(btn => {
-        const id = btn.dataset.id;
-
-        lapData[id] = {
-            laps: 0,
-            times: []
-        };
-
-        btn.addEventListener("click", () => {
-            if (!startTime) return;
-
-            const seconds = Math.floor((Date.now() - startTime) / 1000);
-
-            lapData[id].laps += 1;
-            lapData[id].times.push(seconds);
-
-            btn.querySelector(".lap-count").textContent = lapData[id].laps;
-
-            const m = Math.floor(seconds / 60);
-            const s = seconds % 60;
-            btn.querySelector(".last-time").textContent =
-                `${m}:${s.toString().padStart(2, "0")}`;
-        });
-    });
-
-    /* =====================================================
-       UNDO
-    ===================================================== */
-    document.querySelectorAll(".undo-btn").forEach(btn => {
-        const id = btn.dataset.id;
-
-        btn.addEventListener("click", () => {
-            const data = lapData[id];
-            if (!data || data.laps === 0) return;
-
-            data.laps -= 1;
-            data.times.pop();
-
-            const card = btn.closest(".card");
-            card.querySelector(".lap-count").textContent = data.laps;
-
-            if (data.times.length) {
-                const seconds = data.times[data.times.length - 1];
-                const m = Math.floor(seconds / 60);
-                const s = seconds % 60;
-                card.querySelector(".last-time").textContent =
-                    `${m}:${s.toString().padStart(2, "0")}`;
-            } else {
-                card.querySelector(".last-time").textContent = "--";
-            }
-        });
-    });
-
-    /* =====================================================
-       FINISH
-    ===================================================== */
-    document.getElementById("finish-btn").onclick = () => {
+    btn.addEventListener("click", () => {
         if (!startTime) return;
 
-        clearInterval(timerInterval);
+        const sec = Math.floor((Date.now() - startTime) / 1000);
 
-        if (!confirm("Finish race and send results?")) return;
+        lapData[id].laps++;
+        lapData[id].times.push(sec);
 
-        fetch("", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify(lapData)
-        }).then(() => {
-            window.location.href = "../results/timed/";
-        });
-    };
+        btn.querySelector(".lap-count").textContent = lapData[id].laps;
+        btn.querySelector(".last-time").textContent = fmt(sec);
+
+        updatePredictions();
+    });
+});
+
+/* ===================================================== */
+/* UNDO */
+document.querySelectorAll(".undo-btn").forEach(btn => {
+    const id = btn.dataset.id;
+
+    btn.addEventListener("click", () => {
+        const data = lapData[id];
+        if (!data.laps) return;
+
+        data.laps--;
+        data.times.pop();
+
+        const card = btn.closest(".card");
+        card.querySelector(".lap-count").textContent = data.laps;
+        card.querySelector(".last-time").textContent =
+            data.times.length ? fmt(data.times.at(-1)) : "--";
+
+        updatePredictions();
+    });
+});
+
+/* ===================================================== */
+timerInterval = setInterval(() => {
+    if (!startTime) return;
+
+    const diff = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(diff / 60);
+    const s = diff % 60;
+    clock.textContent = `${m}:${s.toString().padStart(2, "0")}`;
+
+    updatePredictions();
+}, 1000);
+
+/* ===================================================== */
+function updatePredictions() {
+
+    const body = document.getElementById("prediction-body");
+    if (!body) return;
+
+    document.querySelectorAll(".lap-btn")
+        .forEach(b => b.classList.remove("lap-warning","lap-imminent","lap-late"));
+
+    const rows = [];
+    const maxLaps = Math.max(...Object.values(lapData).map(d => d.laps || 0));
+    const now = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+
+    Object.entries(lapData).forEach(([id, d]) => {
+        if (!d.laps || !d.py) return;
+
+        const last = d.times.at(-1);
+        const avg = last / d.laps;
+        const next = last + avg;
+        const corrected = last * (maxLaps / d.laps) * 1000 / d.py;
+
+        rows.push({ id, helm:d.helm, laps:d.laps, last, next, corrected });
+    });
+
+    rows.sort((a,b) => a.next - b.next);
+    currentPredictions = rows;
 
     /* =====================================================
-       RESET
+    BUNCH DETECTION
     ===================================================== */
-    function resetRace() {
-        clearInterval(timerInterval);
-        clearInterval(countdownInterval);
+    const bunch = rows.filter(r => Math.abs(r.next - now) <= BUNCH_WINDOW);
 
-        startTime = null;
-        clock.textContent = "00:00";
+    const currentOrder = sortable.toArray();  // ids in screen order
+    const shouldBeTop = bunch.map(b => String(b.id));
+    const topNow = currentOrder.slice(0, shouldBeTop.length);
 
-        enableLaps(false);
+    const alreadyGood = shouldBeTop.every(id => topNow.includes(id));
 
-        startControls.classList.remove("d-none");
-        restartBtn.classList.add("d-none");
-
-        Object.keys(lapData).forEach(id => {
-            lapData[id].laps = 0;
-            lapData[id].times = [];
-        });
-
-        document.querySelectorAll(".lap-count").forEach(el => el.textContent = 0);
-        document.querySelectorAll(".last-time").forEach(el => el.textContent = "--");
+    if (bunch.length >= 2 && !alreadyGood) {
+        sortBtn.classList.add("sort-warning");
+        sortBtn.textContent = "⚠ BUNCH – consider sorting";
+    } else {
+        sortBtn.classList.remove("sort-warning");
+        sortBtn.textContent = "Sort By Predicted Arrival";
     }
+
+
+    rows.forEach(r => {
+        const btn = document.querySelector(`.lap-btn[data-id="${r.id}"]`);
+        if (!btn) return;
+
+        const eta = r.next - now;
+
+        if (eta <= 10 && eta > 5) btn.classList.add("lap-warning");
+        else if (eta <= 5 && eta >= 0) btn.classList.add("lap-imminent");
+        else if (eta < 0) btn.classList.add("lap-late");
+    });
+
+    body.innerHTML = "";
+    rows.forEach((r,i)=>{
+        body.innerHTML += `
+            <tr>
+                <td>${i+1}</td>
+                <td>${r.helm}</td>
+                <td>${r.laps}</td>
+                <td>${fmt(r.last)}</td>
+                <td>${fmt(r.next)}</td>
+                <td>${fmt(r.corrected)}</td>
+            </tr>`;
+    });
+}
+
+/* ===================================================== */
+/* SORT BUTTON */
+// sortBtn.onclick = () => {
+//     if (!currentPredictions.length) return;
+
+//     const order = currentPredictions.map(r => String(r.id));
+
+//     console.log("Sorting to:", order);
+
+//     sortable.sort(order);
+// };
+sortBtn.onclick = () => {
+    if (!currentPredictions.length) return;
+
+    const order = currentPredictions.map(r => String(r.id));
+    sortable.sort(order);
+};
+
+
+
+/* ===================================================== */
+function fmt(sec){
+    if (!sec) return "--";
+    const m = Math.floor(sec/60);
+    const s = Math.floor(sec%60);
+    return `${m}:${s.toString().padStart(2,"0")}`;
+}
 
 });
 </script>
