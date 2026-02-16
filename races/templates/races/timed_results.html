@@ -5,6 +5,20 @@
 <!-- {{ race.status }}
 PREVIEW = {{ preview|default:"NONE" }} -->
 
+<div class="mb-3">
+    Attempts:
+    {% for i in state.total_attempts|make_list %}
+    {% endfor %}
+</div>
+<div class="mb-3">
+    {% for i in attempt_numbers %}
+        <a href="?attempt={{ i }}"
+           class="btn btn-sm {% if i == state.attempt %}btn-primary{% else %}btn-outline-primary{% endif %}">
+            Attempt {{ i }}
+        </a>
+    {% endfor %}
+</div>
+
 <form method="post" id="timed-form">
 {% csrf_token %}
 

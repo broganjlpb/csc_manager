@@ -98,39 +98,49 @@ def format_seconds(total):
 
 #----------------------------------------------------------#
 
-def build_race_state(race_id):
-    events = RaceEvent.objects.filter(race_id=race_id).order_by(
-        "device_id", "sequence"
+def build_race_state(race_id, attempt=None):
+
+    all_events = list(
+        RaceEvent.objects.filter(race_id=race_id)
+        .order_by("device_id", "sequence")
     )
 
+    # -------------------------------------------------
+    # FIND RESTART POINTS
+    # -------------------------------------------------
+    restart_indexes = [-1]
+
+    for i, ev in enumerate(all_events):
+        if ev.event_type == "restart":
+            restart_indexes.append(i)
+
+    total_attempts = len(restart_indexes)
+
+    if attempt is None or attempt > total_attempts:
+        attempt = total_attempts
+
+    start_index = restart_indexes[attempt - 1] + 1
+    end_index = (
+        restart_indexes[attempt]
+        if attempt < total_attempts
+        else len(all_events)
+    )
+
+    events = all_events[start_index:end_index]
+
+    # -------------------------------------------------
+    # INITIAL STATE
+    # -------------------------------------------------
     state = {
         "started": False,
         "finished": False,
         "race_time": 0,
-        "boats": {}
+        "attempt": attempt,
+        "total_attempts": total_attempts,
+        "boats": {},
+        "history": [],   # ⭐ important
     }
 
-####
-    events = list(
-        RaceEvent.objects
-        .filter(race_id=race_id)
-        .order_by("device_id", "sequence")
-    )
-
-    # find index of last restart
-    last_restart_index = -1
-    for i, ev in enumerate(events):
-        if ev.event_type == "restart":
-            last_restart_index = i
-
-    # cut history
-    if last_restart_index >= 0:
-        events = events[last_restart_index + 1:]
-
-
-####
-
-    # initialise boats from DB
     entries = RaceEntry.objects.filter(race_id=race_id).select_related(
         "helm", "boat"
     )
@@ -144,11 +154,59 @@ def build_race_state(race_id):
             "laps": 0,
             "times": [],
             "last": 0,
-            "corrected": 0,
-            "boat_class": e.boat_type_name
+            "corrected": None,
+            "boat_class": getattr(e.boat, "boat_type", None).name
+                if getattr(e.boat, "boat_type", None) else "",
         }
 
-    # replay events
+    # -------------------------------------------------
+    # SNAPSHOT FUNCTION
+    # -------------------------------------------------
+    def snapshot(time_value):
+
+        boats = list(state["boats"].values())
+
+        # corrected at this moment
+        max_laps = max((b["laps"] for b in boats), default=0)
+
+        for b in boats:
+            if b["laps"] > 0 and b["py"]:
+                projected = b["last"] * (max_laps / b["laps"])
+                b["corrected"] = projected * 1000 / b["py"]
+            else:
+                b["corrected"] = None
+
+        # actual
+        actual = sorted(
+            boats,
+            key=lambda x: (-x["laps"], x["last"] or 999999)
+        )
+        for i, b in enumerate(actual, 1):
+            b["actual_pos"] = i
+
+        # corrected
+        corrected = sorted(
+            boats,
+            key=lambda x: x["corrected"] if x["corrected"] is not None else 999999
+        )
+        for i, b in enumerate(corrected, 1):
+            b["corrected_pos"] = i
+
+        # ⭐ append (do NOT reset!)
+        state["history"].append({
+            "time": time_value,
+            "boats": {
+                b["entry_id"]: {
+                    "actual_pos": b["actual_pos"],
+                    "corrected_pos": b["corrected_pos"],
+                }
+                for b in boats
+            }
+        })
+
+    # -------------------------------------------------
+    # REPLAY EVENTS
+    # -------------------------------------------------
     for ev in events:
 
         if ev.event_type == "start":
@@ -156,10 +214,14 @@ def build_race_state(race_id):
 
         elif ev.event_type == "lap" and ev.race_entry_id:
             b = state["boats"][ev.race_entry_id]
+
             b["laps"] += 1
             b["times"].append(ev.race_seconds)
             b["last"] = ev.race_seconds
+
             state["race_time"] = max(state["race_time"], ev.race_seconds or 0)
+
+            snapshot(state["race_time"])  # ⭐ magic moment
 
         elif ev.event_type == "undo" and ev.race_entry_id:
             b = state["boats"][ev.race_entry_id]
@@ -172,34 +234,18 @@ def build_race_state(race_id):
             state["finished"] = True
 
     # -------------------------------------------------
-    # CALCULATE CORRECTED
+    # FINAL POSITIONS (for table)
     # -------------------------------------------------
-    max_laps = max((b["laps"] for b in state["boats"].values()), default=0)
-
-    for b in state["boats"].values():
-        if b["laps"] > 0 and b["py"]:
-            projected = b["last"] * (max_laps / b["laps"])
-            b["corrected"] = projected * 1000 / b["py"]
-
-    # -------------------------------------------------
-    # POSITIONS
-    # -------------------------------------------------
-    actual = sorted(
-        state["boats"].values(),
-        key=lambda x: (-x["laps"], x["last"])
-    )
-
-    for i, b in enumerate(actual, 1):
-        b["actual_pos"] = i
-
-    corrected = sorted(
-        state["boats"].values(),
-        key=lambda x: x["corrected"] or 999999
-    )
-
-    for i, b in enumerate(corrected, 1):
-        b["corrected_pos"] = i
+    if state["history"]:
+        final = state["history"][-1]["boats"]
+        for boat_id, b in state["boats"].items():
+            if boat_id in final:
+                b["actual_pos"] = final[boat_id]["actual_pos"]
+                b["corrected_pos"] = final[boat_id]["corrected_pos"]
 
     return state
 
+
+
+#----------------------------------------------------------#
 
