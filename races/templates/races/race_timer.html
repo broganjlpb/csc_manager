@@ -2,13 +2,14 @@
 {% block content %}
 
 <style>
-@keyframes blink { 50% { opacity: 0.25; } }
+.lap-btn {
+    width: 100%;
+    touch-action: manipulation;
+}
 
-.lap-btn { width: 100%; }
-
-.lap-warning  { border: 4px solid #20c997 !important; }
-.lap-imminent { border: 4px solid #ffc107 !important; animation: blink .7s linear infinite; }
-.lap-late     { border: 4px solid #dc3545 !important; }
+/* simple, stable indicators */
+.lap-coming { border: 4px solid #20c997 !important; }
+.lap-late   { border: 4px solid #dc3545 !important; }
 
 .sort-warning {
     background: #ffc107;
@@ -26,13 +27,6 @@
     border-bottom: 1px solid #ddd;
 }
 
-/* ⭐ GRID — REQUIRED FOR ANIMATION */
-/* .boat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, 150px);
-    gap: 8px;
-} */
-
 .boat-grid {
     display: flex;
     flex-wrap: wrap;
@@ -40,9 +34,7 @@
 
 .boat-tile {
     width: 150px;
-    transform: translateZ(0);
 }
-
 </style>
 
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
@@ -64,6 +56,7 @@
 
     <h2 id="clock" class="display-6 fw-bold">00:00</h2>
 
+
     <div class="mb-2">
         <button class="btn btn-sm btn-outline-secondary"
                 data-bs-toggle="collapse"
@@ -74,6 +67,14 @@
         <button id="sort-advice-btn"
                 class="btn btn-sm btn-outline-secondary ms-2">
             Sort By Predicted Arrival
+        </button>
+
+        <span id="sync-indicator" class="badge bg-success ms-2">
+            SYNC
+        </span>
+
+        <button id="toggle-offline" class="btn btn-sm btn-outline-danger ms-2">
+            Simulate Offline
         </button>
 
         <div id="prediction-panel" class="collapse mt-2">
@@ -101,7 +102,7 @@
         <div class="card">
             <div class="card-body p-2">
 
-                <button class="btn btn-lg btn-primary w-100 lap-btn mb-2"
+                <button class="btn btn-lg btn-primary lap-btn mb-2"
                         data-id="{{ e.id }}"
                         data-py="{{ e.py_used|stringformat:'s' }}"
                         data-helm="{{ e.helm.username }}">
@@ -141,6 +142,8 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
+let forceOffline = false;
+
 document.addEventListener("DOMContentLoaded", function () {
 
 const BUNCH_WINDOW = 5;
@@ -159,25 +162,112 @@ const lapData = {};
 const lapButtons = document.querySelectorAll(".lap-btn");
 let currentPredictions = [];
 
-/* ⭐ SORTABLE */
-// const sortable = Sortable.create(grid, {
-//     animation: 1000,
-//     sort: false,
-//     draggable: ".boat-tile",
-//     dataIdAttr: "data-id"
-// });
-const sortable = Sortable.create(grid, {
-    animation: 600,
-    easing: "cubic-bezier(0.2, 0, 0, 1)",
-    draggable: ".boat-tile",
-    dataIdAttr: "data-id",
-    forceFallback: true
+/* =====================================================
+   SYNC
+===================================================== */
+let deviceId = localStorage.getItem("device_id");
+if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem("device_id", deviceId);
+}
+
+let sequence = parseInt(localStorage.getItem("sequence") || "1");
+let queue = JSON.parse(localStorage.getItem("event_queue") || "[]");
+let allowExit = false;
+
+setSync(queue.length === 0);
+
+window.addEventListener("beforeunload", function (e) {
+    if (!allowExit && queue.length > 0) {
+        e.preventDefault();
+        e.returnValue = "Data not synced!";
+    }
 });
 
+function setSync(ok) {
+    const badge = document.getElementById("sync-indicator");
+    if (!badge) return;
 
-// console.log("SORTABLE INIT", sortable);
-// console.log("ITEMS:", sortable.toArray());
-// console.log("SORT TO:", order);
+    if (ok && queue.length === 0) {
+        badge.classList.remove("bg-danger");
+        badge.classList.add("bg-success");
+        badge.textContent = "SYNC";
+    } else {
+        badge.classList.remove("bg-success");
+        badge.classList.add("bg-danger");
+        badge.textContent = "OFFLINE";
+    }
+}
+
+function saveQueue() {
+    localStorage.setItem("event_queue", JSON.stringify(queue));
+    localStorage.setItem("sequence", sequence);
+}
+
+function sendToServer(event) {
+    if (forceOffline) return Promise.reject("offline");
+
+    return fetch("/races/api/race-event/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event)
+    });
+}
+
+function enqueueEvent(event) {
+    queue.push(event);
+    saveQueue();
+    setSync(false);
+}
+
+function processQueue() {
+    if (!queue.length) {
+        setSync(true);
+        return;
+    }
+
+    const event = queue[0];
+
+    sendToServer(event)
+        .then(r => {
+            if (!r.ok) throw "fail";
+            queue.shift();
+            saveQueue();
+            setSync(queue.length === 0);
+        })
+        .catch(() => setSync(false));
+}
+
+setInterval(processQueue, 2000);
+
+const RACE_ID = Number("{{ race.id }}");
+
+function sendEvent(type, raceEntryId = null, raceSeconds = null) {
+    const event = {
+        race: RACE_ID,
+        device_id: deviceId,
+        sequence: sequence++,
+        event_type: type,
+        race_entry: raceEntryId,
+        race_seconds: raceSeconds
+    };
+
+    sendToServer(event)
+        .then(r => {
+            if (!r.ok) throw "fail";
+            setSync(true);
+        })
+        .catch(() => enqueueEvent(event));
+
+    saveQueue();
+}
+
+/* ===================================================== */
+const sortable = Sortable.create(grid, {
+    animation: 0,
+    draggable: ".boat-tile",
+    dataIdAttr: "data-id"
+});
 
 /* ===================================================== */
 function enableLaps(enabled) {
@@ -188,14 +278,27 @@ enableLaps(false);
 /* ===================================================== */
 function startRaceClock() {
     clearInterval(countdownInterval);
+    clearInterval(timerInterval);
+
     enableLaps(true);
     startTime = Date.now();
+
+    timerInterval = setInterval(tick, 1000);
+    sendEvent("start");
+}
+
+function tick() {
+    if (!startTime) return;
+
+    const diff = Math.floor((Date.now() - startTime) / 1000);
+    clock.textContent = fmt(diff);
+    updatePredictions();
 }
 
 /* ===================================================== */
 function startCountdown(minutes) {
 
-    if (startTime || countdownInterval) {
+    if (startTime !== null || countdownInterval !== null) {
         if (!confirm("Restart sequence? All times will be lost.")) return;
         resetRace();
     }
@@ -207,27 +310,53 @@ function startCountdown(minutes) {
 
     countdownInterval = setInterval(() => {
         remaining--;
-        const m = Math.floor(remaining / 60);
-        const s = remaining % 60;
-        clock.textContent = `Start in ${m}:${s.toString().padStart(2, "0")}`;
-
+        clock.textContent = `Start in ${fmt(remaining)}`;
         if (remaining === 0) startRaceClock();
     }, 1000);
 }
 
-/* ===================================================== */
 document.getElementById("btn-5").onclick = () => startCountdown(5);
 document.getElementById("btn-3").onclick = () => startCountdown(3);
 document.getElementById("btn-1").onclick = () => startCountdown(1);
 document.getElementById("btn-now").onclick = () => startCountdown(0);
 
+/* ===================================================== */
 restartBtn.onclick = () => {
     if (!confirm("Restart race?")) return;
     resetRace();
+    sendEvent("restart");
+};
+
+function resetRace() {
+    clearInterval(timerInterval);
+    clearInterval(countdownInterval);
+    startTime = null;
+    clock.textContent = "00:00";
+    enableLaps(false);
+
+    startControls.classList.remove("d-none");
+    restartBtn.classList.add("d-none");
+
+    Object.values(lapData).forEach(d => {
+        d.laps = 0;
+        d.times = [];
+    });
+
+    document.querySelectorAll(".lap-count").forEach(e => e.textContent = 0);
+    document.querySelectorAll(".last-time").forEach(e => e.textContent = "--");
+
+    currentPredictions = [];
+    updatePredictions();
+}
+
+/* ===================================================== */
+document.getElementById("toggle-offline").onclick = function () {
+    forceOffline = !forceOffline;
+    this.textContent = forceOffline ? "Offline Mode ON" : "Simulate Offline";
 };
 
 /* ===================================================== */
-/* LAP BUTTONS */
+/* LAPS */
 lapButtons.forEach(btn => {
     const id = btn.dataset.id;
 
@@ -249,42 +378,41 @@ lapButtons.forEach(btn => {
         btn.querySelector(".lap-count").textContent = lapData[id].laps;
         btn.querySelector(".last-time").textContent = fmt(sec);
 
+        sendEvent("lap", id, sec);
         updatePredictions();
     });
 });
 
 /* ===================================================== */
-/* UNDO */
 document.querySelectorAll(".undo-btn").forEach(btn => {
     const id = btn.dataset.id;
 
     btn.addEventListener("click", () => {
-        const data = lapData[id];
-        if (!data.laps) return;
+        const d = lapData[id];
+        if (!d.laps) return;
 
-        data.laps--;
-        data.times.pop();
+        d.laps--;
+        d.times.pop();
 
         const card = btn.closest(".card");
-        card.querySelector(".lap-count").textContent = data.laps;
+        card.querySelector(".lap-count").textContent = d.laps;
         card.querySelector(".last-time").textContent =
-            data.times.length ? fmt(data.times.at(-1)) : "--";
+            d.times.length ? fmt(d.times.at(-1)) : "--";
 
+        sendEvent("undo", id);
         updatePredictions();
     });
 });
 
 /* ===================================================== */
-timerInterval = setInterval(() => {
+document.getElementById("finish-btn").onclick = () => {
     if (!startTime) return;
+    if (!confirm("Finish race?")) return;
 
-    const diff = Math.floor((Date.now() - startTime) / 1000);
-    const m = Math.floor(diff / 60);
-    const s = diff % 60;
-    clock.textContent = `${m}:${s.toString().padStart(2, "0")}`;
-
-    updatePredictions();
-}, 1000);
+    sendEvent("finish");
+    allowExit = true;
+    window.location.href = "../results/timed/";
+};
 
 /* ===================================================== */
 function updatePredictions() {
@@ -293,7 +421,7 @@ function updatePredictions() {
     if (!body) return;
 
     document.querySelectorAll(".lap-btn")
-        .forEach(b => b.classList.remove("lap-warning","lap-imminent","lap-late"));
+        .forEach(b => b.classList.remove("lap-coming","lap-late"));
 
     const rows = [];
     const maxLaps = Math.max(...Object.values(lapData).map(d => d.laps || 0));
@@ -313,34 +441,13 @@ function updatePredictions() {
     rows.sort((a,b) => a.next - b.next);
     currentPredictions = rows;
 
-    /* =====================================================
-    BUNCH DETECTION
-    ===================================================== */
-    const bunch = rows.filter(r => Math.abs(r.next - now) <= BUNCH_WINDOW);
-
-    const currentOrder = sortable.toArray();  // ids in screen order
-    const shouldBeTop = bunch.map(b => String(b.id));
-    const topNow = currentOrder.slice(0, shouldBeTop.length);
-
-    const alreadyGood = shouldBeTop.every(id => topNow.includes(id));
-
-    if (bunch.length >= 2 && !alreadyGood) {
-        sortBtn.classList.add("sort-warning");
-        sortBtn.textContent = "⚠ BUNCH – consider sorting";
-    } else {
-        sortBtn.classList.remove("sort-warning");
-        sortBtn.textContent = "Sort By Predicted Arrival";
-    }
-
-
     rows.forEach(r => {
         const btn = document.querySelector(`.lap-btn[data-id="${r.id}"]`);
         if (!btn) return;
 
         const eta = r.next - now;
 
-        if (eta <= 10 && eta > 5) btn.classList.add("lap-warning");
-        else if (eta <= 5 && eta >= 0) btn.classList.add("lap-imminent");
+        if (eta <= 10 && eta >= 0) btn.classList.add("lap-coming");
         else if (eta < 0) btn.classList.add("lap-late");
     });
 
@@ -359,32 +466,22 @@ function updatePredictions() {
 }
 
 /* ===================================================== */
-/* SORT BUTTON */
-// sortBtn.onclick = () => {
-//     if (!currentPredictions.length) return;
-
-//     const order = currentPredictions.map(r => String(r.id));
-
-//     console.log("Sorting to:", order);
-
-//     sortable.sort(order);
-// };
 sortBtn.onclick = () => {
     if (!currentPredictions.length) return;
-
-    const order = currentPredictions.map(r => String(r.id));
-    sortable.sort(order);
+    sortable.sort(currentPredictions.map(r => String(r.id)));
 };
-
-
 
 /* ===================================================== */
 function fmt(sec){
-    if (!sec) return "--";
-    const m = Math.floor(sec/60);
-    const s = Math.floor(sec%60);
+    if (sec == null) return "--";
+
+    sec = Math.round(sec);   // ⭐ key line
+
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
     return `${m}:${s.toString().padStart(2,"0")}`;
 }
+
 
 });
 </script>

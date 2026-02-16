@@ -561,5 +561,49 @@ def race_timer(request, pk):
         "entries": entries,
     })
 
+import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.db import IntegrityError
+
+from .models import RaceEvent, RaceEntry
+
+
+@csrf_exempt
+def race_event_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+
+        race_id = data["race"]
+        device_id = data["device_id"]
+        sequence = data["sequence"]
+        event_type = data["event_type"]
+        race_seconds = data.get("race_seconds")
+        entry_id = data.get("race_entry")
+
+        entry = None
+        if entry_id:
+            entry = RaceEntry.objects.get(id=entry_id)
+
+        RaceEvent.objects.create(
+            race_id=race_id,
+            device_id=device_id,
+            sequence=sequence,
+            event_type=event_type,
+            race_entry=entry,
+            race_seconds=race_seconds,
+        )
+
+        return JsonResponse({"status": "ok"})
+
+    except IntegrityError:
+        # duplicate → safe → treat as success
+        return JsonResponse({"status": "duplicate"})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
 
 

@@ -179,3 +179,34 @@ class RaceResult(models.Model):
     def __str__(self):
         return f"{self.entry} – {self.status}"
 
+class RaceEvent(models.Model):
+    race = models.ForeignKey(Race, on_delete=models.PROTECT)
+
+    # which physical timer created this record
+    device_id = models.CharField(max_length=100)
+
+    # sequence number from that device
+    sequence = models.IntegerField()
+
+    # start, lap, undo, finish, restart etc
+    event_type = models.CharField(max_length=50)
+
+    # which boat (if relevant)
+    race_entry = models.ForeignKey(
+        RaceEntry,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT
+    )
+
+    # seconds from race start
+    race_seconds = models.IntegerField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("device_id", "sequence")
+        ordering = ["sequence"]
+
+
+
