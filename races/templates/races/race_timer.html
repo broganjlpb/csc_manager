@@ -76,6 +76,9 @@
         <button id="toggle-offline" class="btn btn-sm btn-outline-danger ms-2">
             Simulate Offline
         </button>
+        <button id="clear-queue" class="btn btn-sm btn-outline-secondary">
+            Clear Queue
+        </button>
 
         <div id="prediction-panel" class="collapse mt-2">
             <table class="table table-sm table-borderless small text-muted mb-0">
@@ -176,29 +179,30 @@ let queue = JSON.parse(localStorage.getItem("event_queue") || "[]");
 let allowExit = false;
 
 setSync(queue.length === 0);
-
+/* ===================================================== */
 window.addEventListener("beforeunload", function (e) {
     if (!allowExit && queue.length > 0) {
         e.preventDefault();
         e.returnValue = "Data not synced!";
     }
 });
-
+/* ===================================================== */
 function setSync(ok) {
-    const badge = document.getElementById("sync-indicator");
-    if (!badge) return;
+    const syncIndicator = document.getElementById("sync-indicator");
+    if (!syncIndicator) return;
 
     if (ok && queue.length === 0) {
-        badge.classList.remove("bg-danger");
-        badge.classList.add("bg-success");
-        badge.textContent = "SYNC";
+        syncIndicator.classList.remove("bg-danger");
+        syncIndicator.classList.add("bg-success");
+        syncIndicator.textContent = "SYNC";
     } else {
-        badge.classList.remove("bg-success");
-        badge.classList.add("bg-danger");
-        badge.textContent = "OFFLINE";
+        syncIndicator.classList.remove("bg-success");
+        syncIndicator.classList.add("bg-danger");
+        syncIndicator.textContent = `OFFLINE (${queue.length})`;
     }
 }
 
+/* ===================================================== */
 function saveQueue() {
     localStorage.setItem("event_queue", JSON.stringify(queue));
     localStorage.setItem("sequence", sequence);
@@ -219,29 +223,46 @@ function enqueueEvent(event) {
     saveQueue();
     setSync(false);
 }
-
+/* ===================================================== */
 function processQueue() {
+
     if (!queue.length) {
         setSync(true);
         return;
     }
 
-    const event = queue[0];
+    // send events back-to-back until one fails
+    const sendNext = () => {
 
-    sendToServer(event)
-        .then(r => {
-            if (!r.ok) throw "fail";
-            queue.shift();
-            saveQueue();
-            setSync(queue.length === 0);
-        })
-        .catch(() => setSync(false));
+        if (!queue.length) {
+            setSync(true);
+            return;
+        }
+
+        const event = queue[0];
+
+        sendToServer(event)
+            .then(r => {
+                if (!r.ok) throw "fail";
+
+                queue.shift();     // remove
+                saveQueue();
+
+                sendNext();        // 🔥 immediately send the next one
+            })
+            .catch(() => {
+                setSync(false);    // stop if network bad again
+            });
+    };
+
+    sendNext();
 }
+/* ===================================================== */
 
 setInterval(processQueue, 2000);
 
 const RACE_ID = Number("{{ race.id }}");
-
+/* ===================================================== */
 function sendEvent(type, raceEntryId = null, raceSeconds = null) {
     const event = {
         race: RACE_ID,
@@ -348,6 +369,17 @@ function resetRace() {
     currentPredictions = [];
     updatePredictions();
 }
+
+/* ===================================================== */
+
+document.getElementById("clear-queue").onclick = () => {
+    localStorage.removeItem("event_queue");
+    localStorage.removeItem("sequence");
+    queue = [];
+    sequence = 1;
+    setSync(true);
+    console.log("Queue cleared");
+};
 
 /* ===================================================== */
 document.getElementById("toggle-offline").onclick = function () {
