@@ -1,6 +1,7 @@
 from collections import defaultdict
 from math import ceil
-from races.models import RaceEvent, RaceEntry
+from races.models import RaceEvent, RaceEntry, ResultSet, ResultSetEntry, RaceEntry
+from django.utils import timezone
 
 
 def calculate_points(position, max_points=14):
@@ -245,7 +246,142 @@ def build_race_state(race_id, attempt=None):
 
     return state
 
+#----------------------------------------------------------#
 
+def derive_race_state(race):
+
+    if race.is_cancelled:
+        return "CANCELLED"
+
+    has_published = race.result_sets.filter(
+        state=ResultSet.State.PUBLISHED
+    ).exists()
+
+    if has_published:
+        return "PUBLISHED"
+
+    has_finished_event = RaceEvent.objects.filter(
+        race=race,
+        event_type="finish"
+    ).exists()
+
+    if has_finished_event:
+        return "UNCONFIRMED"
+
+    has_started = RaceEvent.objects.filter(
+        race=race,
+        event_type="start"
+    ).exists()
+
+    if has_started:
+        return "LIVE"
+
+    if race.raceentry_set.exists():
+        return "READY"
+
+    return "DRAFT"
 
 #----------------------------------------------------------#
 
+def get_or_create_user_resultset(race, user, source):
+    result_set, created = ResultSet.objects.get_or_create(
+        race=race,
+        created_by=user,
+        source=source,
+        defaults={"state": ResultSet.State.DRAFT},
+    )
+
+    if not created:
+        return result_set
+
+    # -------------------------------------------------
+    # Populate if needed
+    # -------------------------------------------------
+
+    if source == ResultSet.Source.MANUAL_TIME:
+        populate_manual_time(result_set)
+
+    elif source == ResultSet.Source.MANUAL_POSITION:
+        populate_manual_position(result_set)
+
+    return result_set
+
+#----------------------------------------------------------#
+
+def populate_manual_time(result_set):
+    race = result_set.race
+    user = result_set.created_by
+
+    # Try to copy from user's timed result
+    try:
+        timed = ResultSet.objects.get(
+            race=race,
+            created_by=user,
+            source=ResultSet.Source.TIMED
+        )
+        copy_entries(timed, result_set)
+        return
+    except ResultSet.DoesNotExist:
+        pass
+
+    # Else blank
+    create_blank_entries(result_set)
+
+#----------------------------------------------------------#
+
+def populate_manual_position(result_set):
+    race = result_set.race
+    user = result_set.created_by
+
+    # 1️⃣ Manual time
+    try:
+        manual_time = ResultSet.objects.get(
+            race=race,
+            created_by=user,
+            source=ResultSet.Source.MANUAL_TIME
+        )
+        copy_entries(manual_time, result_set)
+        return
+    except ResultSet.DoesNotExist:
+        pass
+
+    # 2️⃣ Timed
+    try:
+        timed = ResultSet.objects.get(
+            race=race,
+            created_by=user,
+            source=ResultSet.Source.TIMED
+        )
+        copy_entries(timed, result_set)
+        return
+    except ResultSet.DoesNotExist:
+        pass
+
+    # 3️⃣ Blank
+    create_blank_entries(result_set)
+
+#----------------------------------------------------------#
+
+def create_blank_entries(result_set):
+    entries = RaceEntry.objects.filter(race=result_set.race)
+
+    for e in entries:
+        ResultSetEntry.objects.create(
+            result_set=result_set,
+            race_entry=e
+        )
+
+#----------------------------------------------------------#
+
+def copy_entries(source, target):
+    for entry in source.entries.all():
+        ResultSetEntry.objects.create(
+            result_set=target,
+            race_entry=entry.race_entry,
+            laps=entry.laps,
+            elapsed_seconds=entry.elapsed_seconds,
+            finish_position=entry.finish_position,
+            corrected_seconds=entry.corrected_seconds,
+        )
+
+#----------------------------------------------------------#

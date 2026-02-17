@@ -2,9 +2,9 @@ from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from django.views.generic import CreateView, UpdateView, ListView, DetailView, FormView
-from .models import BoatType, RegisteredBoat, League, Race, RaceEntry, RaceResult, Event, Race, RaceEvent
+from .models import BoatType, RegisteredBoat, League, Race, RaceEntry, RaceResult, Event, Race, RaceEvent, ResultSet, ResultSetEntry
 from members.models import Member
-from .forms import BoatTypeForm, RegisteredBoatForm, LeagueForm, RaceEntryForm, RaceEntry, RaceCreateForm
+from .forms import BoatTypeForm, RegisteredBoatForm, LeagueForm, RaceEntryForm, RaceEntry, RaceCreateForm, Race
 from django.utils import timezone
 from django.db.models import Exists, OuterRef
 from django.contrib.auth.mixins import PermissionRequiredMixin
@@ -19,10 +19,12 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError
-from races.services import build_race_state
 
-from races.models import Race, RaceEntry
+from races.models import Race, RaceEntry, ResultSet, ResultSetEntry
 from races.services import build_race_state, corrected_time, format_seconds 
+from races.services import get_or_create_user_resultset, calculate_points
+
+
 
 
 class BoatTypeListView(ListView):
@@ -30,6 +32,7 @@ class BoatTypeListView(ListView):
     template_name = "races/boattype_list.html"
     context_object_name = "boats"
     ordering = ["name"]
+#----------------------------------------------------------#
 
 class BoatTypeCreateView(CreateView):
     model = BoatType
@@ -43,7 +46,7 @@ class BoatTypeCreateView(CreateView):
         context["submit_text"] = "Create"
         context["cancel_url"] = reverse_lazy("boattype-list")
         return context
-    
+#----------------------------------------------------------#    
 class BoatTypeUpdateView(UpdateView):
     model = BoatType
     form_class = BoatTypeForm
@@ -57,11 +60,13 @@ class BoatTypeUpdateView(UpdateView):
         context["cancel_url"] = reverse_lazy("boattype-list")
         return context
     
+#----------------------------------------------------------# 
 class RegisteredBoatListView(ListView):
     model = RegisteredBoat
     template_name = "races/registeredboat_list.html"
     context_object_name = "registeredboats"
     ordering = ["sail_number"]
+#----------------------------------------------------------#
 
 class RegisteredBoatCreateView(CreateView):
     model = RegisteredBoat
@@ -75,7 +80,8 @@ class RegisteredBoatCreateView(CreateView):
         context["submit_text"] = "Create"
         context["cancel_url"] = reverse_lazy("registered-boats-list")
         return context
-    
+
+#----------------------------------------------------------#   
 class RegisteredBoatUpdateView(UpdateView):
     model = RegisteredBoat
     form_class = RegisteredBoatForm
@@ -88,7 +94,8 @@ class RegisteredBoatUpdateView(UpdateView):
         context["submit_text"] = "Save changes"
         context["cancel_url"] = reverse_lazy("registered-boats-list")
         return context
-    
+
+#----------------------------------------------------------#
 class LeagueListView(ListView):
     model = League
     template_name = "races/leagues_list.html"
@@ -106,6 +113,7 @@ class LeagueListView(ListView):
 
         return qs
 
+#----------------------------------------------------------#
 class LeagueCreateView(PermissionRequiredMixin, CreateView):
     permission_required = "races.add_league"
     permission_denied_message = "You cannot add leagues."
@@ -121,7 +129,8 @@ class LeagueCreateView(PermissionRequiredMixin, CreateView):
         context["submit_text"] = "Create"
         context["cancel_url"] = reverse_lazy("leagues-list")
         return context
-    
+
+#----------------------------------------------------------#
 class LeagueUpdateView(PermissionRequiredMixin, UpdateView):
     permission_required = "races.change_league"
     permission_denied_message = "You cannot edit leagues."
@@ -137,7 +146,8 @@ class LeagueUpdateView(PermissionRequiredMixin, UpdateView):
         context["submit_text"] = "Save changes"
         context["cancel_url"] = reverse_lazy("leagues-list")
         return context
-    
+
+#----------------------------------------------------------#   
 class RaceEntryListView(DetailView):
     model = Race
     template_name = "races/race_entries.html"
@@ -161,6 +171,7 @@ class RaceEntryListView(DetailView):
 
         return context
 
+#----------------------------------------------------------#
 class RaceCreateView(FormView):
     template_name = "forms/form_page.html"
     form_class = RaceCreateForm
@@ -188,6 +199,7 @@ class RaceCreateView(FormView):
         context["cancel_url"] = reverse("races-list")
         return context
 
+#----------------------------------------------------------#
 # -event__start_datetime
 class RaceListView(ListView):
     model = Race
@@ -227,7 +239,7 @@ class RaceListView(ListView):
         context["selected_status"] = self.request.GET.get("status", "all")
 
         return context
-
+#----------------------------------------------------------#
 
 def add_entry(request, pk):
     race = get_object_or_404(Race, pk=pk)
@@ -254,17 +266,19 @@ def add_entry(request, pk):
         "form": form,
         "entries": race.entries.select_related("helm", "crew", "boat"),
     })
-
+#----------------------------------------------------------#
 
 def boat_py(request, pk):
 
     boat = RegisteredBoat.objects.select_related("boat_type").get(pk=pk)
     return JsonResponse({"py": boat.boat_type.py})
+#----------------------------------------------------------#
 
 def delete_entry(request, race_pk, entry_pk):
     entry = get_object_or_404(RaceEntry, pk=entry_pk, race_id=race_pk)
     entry.delete()
     return redirect("race-entries", pk=race_pk)
+#----------------------------------------------------------#
 
 def edit_entry(request, race_pk, entry_pk):
     race = get_object_or_404(Race, pk=race_pk)
@@ -290,49 +304,14 @@ def edit_entry(request, race_pk, entry_pk):
         "existing_crew": list(other_entries.values_list("crew_id", flat=True)),
         "existing_boats": list(other_entries.values_list("boat_id", flat=True)),
     })
+#----------------------------------------------------------#
 
 def reopen_results(request, pk):
     race = get_object_or_404(Race, pk=pk)
     race.status = Race.RaceStatus.OPEN
     race.save()
     return redirect("race-results-manual", pk=pk)
-
-@require_http_methods(["GET", "POST"])
-def manual_results(request, pk):
-    race = get_object_or_404(Race, pk=pk)
-
-    if request.method == "POST":
-        print(request.POST)
-        for entry in race.entries.all():
-
-            pos = request.POST.get(f"position_{entry.id}")
-            status = request.POST.get(f"status_{entry.id}")
-
-            if status in ["dnf", "dsq"]:
-                entry.result_status = status
-                entry.finish_position = None
-            else:
-                entry.result_status = "finished"
-                entry.finish_position = pos
-
-            entry.save()
-
-        # move race forward
-        race.status = Race.RaceStatus.FINISHED
-        race.save()
-
-        # return redirect("races-list")
-        return redirect("race-results-manual", pk=race.pk)
-
-
-    entries = race.entries.select_related("helm", "boat").order_by(F("finish_position").asc(nulls_last=True),"id")
-    for e in entries:
-        e.points = calculate_points(e.finish_position)
-
-    return render(request, "races/manual_results.html", {
-        "race": race,
-        "entries": entries,
-    })
+#----------------------------------------------------------#
 
 def league_table(request, pk):
     league = get_object_or_404(League, pk=pk)
@@ -343,6 +322,7 @@ def league_table(request, pk):
         "league": league,
         "table": table,
     })
+#----------------------------------------------------------#
 
 def active_leagues(request):
     today = now().date()
@@ -542,16 +522,7 @@ def active_leagues(request):
         "entries": entries,
         "preview": preview,
     })
-
-def timed_results_edit(request, pk):
-    race = get_object_or_404(Race, pk=pk)
-
-    race.status = Race.RaceStatus.OPEN
-    race.save()
-
-    messages.warning(request, "Race reopened for editing.")
-
-    return redirect("race-results-timed", pk=race.pk)
+#----------------------------------------------------------#
 
 def race_timer(request, pk):
     race = get_object_or_404(Race, pk=pk)
@@ -577,6 +548,7 @@ def race_timer(request, pk):
         "race": race,
         "entries": entries,
     })
+#----------------------------------------------------------#
 
 @csrf_exempt
 def race_event_api(request):
@@ -614,79 +586,181 @@ def race_event_api(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+#----------------------------------------------------------#
 
 def live_race_page(request, race_id):
     race = get_object_or_404(Race, pk=race_id)
     return render(request, "races/live.html", {"race": race})
+#----------------------------------------------------------#
 
-
-def timed_results(request, pk):
+def timed_results_edit(request, pk):
     race = get_object_or_404(Race, pk=pk)
-    entries = race.entries.select_related("boat", "helm")
 
-    # ⭐ attempt selection
-    attempt = request.GET.get("attempt")
-    attempt = int(attempt) if attempt else None
+    race.status = Race.RaceStatus.OPEN
+    race.save()
 
-    # ⭐ build from history
-    state = build_race_state(race.id, attempt)
+    messages.warning(request, "Race reopened for editing.")
 
-    # ⭐ populate RaceEntry from replay
-    for e in entries:
-        b = state["boats"].get(e.id)
-        if not b:
-            continue
+    return redirect("race-results-timed", pk=race.pk)
 
-        e.laps = b["laps"]
-        e.elapsed_seconds = b["last"]
+#----------------------------------------------------------#
+
+def manual_results(request, pk):
+    race = get_object_or_404(Race, pk=pk)
+    user = request.user
+
+    result_set, created = ResultSet.objects.get_or_create(
+        race=race,
+        created_by=user,
+        source=ResultSet.Source.MANUAL_POSITION,
+    )
+
+    # -------------------------------------------------
+    # Populate defaults if new
+    # -------------------------------------------------
+    if created:
+        base_set = ResultSet.objects.filter(
+            race=race,
+            created_by=user,
+            source=ResultSet.Source.MANUAL_TIME
+        ).first()
+
+        if not base_set:
+            base_set = ResultSet.objects.filter(
+                race=race,
+                created_by=user,
+                source=ResultSet.Source.TIMED
+            ).first()
+
+        if base_set:
+            for entry in base_set.entries.all():
+                ResultSetEntry.objects.create(
+                    result_set=result_set,
+                    race_entry=entry.race_entry,
+                    finish_position=entry.finish_position,
+                    tied=getattr(entry, "tied", False),
+                )
+        else:
+            for e in race.entries.all():
+                ResultSetEntry.objects.create(
+                    result_set=result_set,
+                    race_entry=e
+                )
+
+    entries = list(
+        result_set.entries
+        .select_related("race_entry__boat", "race_entry__helm")
+        .order_by("finish_position", "id")
+    )
 
     preview = None
 
-    # ==========================================================
-    # POST ACTIONS  (UNCHANGED LOGIC)
-    # ==========================================================
+    # -------------------------------------------------
+    # POST
+    # -------------------------------------------------
     if request.method == "POST":
         action = request.POST.get("action")
 
-        if race.status in [
-            Race.RaceStatus.FINISHED,
-            Race.RaceStatus.VERIFIED,
-            Race.RaceStatus.LOCKED,
-        ] and action in ["preview", "confirm"]:
-            messages.error(request, "Results already exist. Use Edit to modify.")
-            return redirect("race-results-timed", pk=race.pk)
+        # Save positions and ties
+        for row in entries:
+            pos = request.POST.get(f"pos_{row.id}")
+            row.finish_position = int(pos) if pos else None
+            row.tied = request.POST.get(f"tie_{row.id}") == "on"
+            row.save()
 
-        # save edits from form
+        # Reload sorted after save
+        entries = list(
+            result_set.entries
+            .select_related("race_entry__boat", "race_entry__helm")
+            .order_by("finish_position", "id")
+        )
+
+        if action == "save":
+            result_set.state = ResultSet.State.SAVED
+            result_set.save()
+            messages.success(request, "Manual positions saved.")
+            return redirect("race-results-manual", pk=race.pk)
+
+        if action == "preview":
+
+            preview = []
+
+            display_position = 0
+            skip = 0
+
+            for index, row in enumerate(entries, start=1):
+
+                if index == 1:
+                    display_position = 1
+                else:
+                    if row.tied:
+                        skip += 1
+                    else:
+                        display_position = display_position + 1 + skip
+                        skip = 0
+
+                preview.append({
+                    "row": row,
+                    "position": display_position,
+                    "points": calculate_points(display_position)
+                })
+    # print("VIEW REACHED")
+    return render(request, "races/manual_results.html", {
+        "race": race,
+        "result_set": result_set,
+        "entries": entries,
+        "preview": preview,
+    })
+
+
+
+
+#----------------------------------------------------------#
+
+def manual_time_results(request, race_id):
+    race = get_object_or_404(Race, pk=race_id)
+
+    result_set = get_or_create_user_resultset(
+        race,
+        request.user,
+        ResultSet.Source.MANUAL_TIME
+    )
+
+    entries = race.entries.select_related("race_entry")
+
+    preview = None
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        # -------------------------
+        # Build in-memory result list
+        # -------------------------
+        temp_results = []
+
         for e in entries:
             laps = request.POST.get(f"laps_{e.id}")
-
             h = request.POST.get(f"h_{e.id}") or 0
             m = request.POST.get(f"m_{e.id}") or 0
             s = request.POST.get(f"s_{e.id}") or 0
 
             total = int(h) * 3600 + int(m) * 60 + int(s)
 
-            e.laps = int(laps) if laps else None
-            e.elapsed_seconds = total if total > 0 else None
+            if laps and total:
+                temp_results.append({
+                    "entry": e,
+                    "laps": int(laps),
+                    "elapsed": total,
+                })
 
-            status = request.POST.get(f"status_{e.id}")
-            if status:
-                e.result_status = status
-            else:
-                e.result_status = RaceEntry.ResultStatus.FINISHED
+        # -------------------------
+        # PREVIEW (memory only)
+        # -------------------------
+        if action == "preview" and temp_results:
 
-            e.save()
-
-        # SAVE ONLY
-        if action == "save":
-            messages.success(request, "Times saved.")
-            return redirect("race-results-timed", pk=race.pk)
-
-        # PREVIEW
-        if action == "preview":
             valid = [
-                e for e in entries
-                if e.elapsed_seconds and e.laps and e.result_status in [None, "", "finished"]
+                e for e in result_set.entries.all()
+                if e.elapsed_seconds and e.laps
             ]
 
             if valid:
@@ -696,110 +770,148 @@ def timed_results(request, pk):
                     valid,
                     key=lambda x: corrected_time(
                         x.elapsed_seconds,
-                        x.py_used,
+                        x.race_entry.py_used,
                         x.laps,
                         max_laps
                     )
                 )
 
-                preview = []
-
-                last_time = None
-                position = 0
-
-                for index, e in enumerate(ranked, start=1):
-                    ct = corrected_time(
-                        e.elapsed_seconds,
-                        e.py_used,
-                        e.laps,
-                        max_laps
-                    )
-
-                    if last_time is None:
-                        position = 1
-                    elif ct > last_time:
-                        position = index
-
-                    preview.append({
-                        "entry": e,
-                        "position": position,
-                        "corrected": format_seconds(ct),
-                    })
-
-                    last_time = ct
-
-        # CONFIRM
-        if action == "confirm":
-            valid = [
-                e for e in entries
-                if e.elapsed_seconds and e.laps and e.result_status not in ["dnf", "dsq"]
-            ]
-
-            if valid:
-                max_laps = max(e.laps for e in valid)
-
-                ranked = sorted(
-                    valid,
-                    key=lambda x: corrected_time(
-                        x.elapsed_seconds,
-                        x.py_used,
-                        x.laps,
-                        max_laps
-                    )
-                )
-
-                for pos, e in enumerate(ranked, start=1):
-                    e.finish_position = pos
-                    e.save()
-
-            race.status = Race.RaceStatus.FINISHED
-            race.save()
-
-            messages.success(request, "Results confirmed.")
-            return redirect("race-results-timed", pk=race.pk)
-
-    # ==========================================================
-    # format for form display
-    # ==========================================================
-    for e in entries:
-        if e.elapsed_seconds:
-            e.h = e.elapsed_seconds // 3600
-            e.m = (e.elapsed_seconds % 3600) // 60
-            e.s = e.elapsed_seconds % 60
-        else:
-            e.h = e.m = e.s = ""
-
-    # show official results if finished
-    if race.status == Race.RaceStatus.FINISHED:
-        valid = [
-            e for e in entries
-            if e.elapsed_seconds and e.laps and e.result_status not in ["dnf", "dsq"]
-        ]
-
-        if valid:
-            max_laps = max(e.laps for e in valid)
 
             preview = []
-
-            for e in valid:
+            for pos, r in enumerate(ranked, 1):
+                corrected = r["elapsed"] * (max_laps / r["laps"])
                 preview.append({
-                    "entry": e,
-                    "position": e.finish_position,
-                    "corrected": format_seconds(
-                        corrected_time(
-                            e.elapsed_seconds,
-                            e.py_used,
-                            e.laps,
-                            max_laps
-                        )
-                    )
+                    "entry": r["entry"],
+                    "position": pos,
+                    "corrected": corrected,
                 })
-    attempt_numbers = list(range(1, state["total_attempts"] + 1))
 
-    return render(request, "races/timed_results.html", {
+        # -------------------------
+        # SAVE → create ResultSet
+        # -------------------------
+        if action in ["save", "publish"]:
+
+            rs = ResultSet.objects.create(
+                race=race,
+                source=ResultSet.Source.MANUAL_TIME,
+                created_by=request.user,
+                state=ResultSet.State.SAVED,
+            )
+
+            max_laps = max(r["laps"] for r in temp_results)
+
+            for pos, r in enumerate(sorted(
+                temp_results,
+                key=lambda x: x["elapsed"] * (max_laps / x["laps"])
+            ), 1):
+
+                corrected = r["elapsed"] * (max_laps / r["laps"])
+
+                ResultSetEntry.objects.create(
+                    result_set=rs,
+                    race_entry=r["entry"],
+                    laps=r["laps"],
+                    elapsed_seconds=r["elapsed"],
+                    finish_position=pos,
+                    corrected_seconds=corrected,
+                )
+
+            if action == "publish":
+                rs.state = ResultSet.State.PUBLISHED
+                rs.published_at = timezone.now()
+                rs.save()
+
+            return redirect("race-detail", race_id=race.id)
+
+    return render(request, "races/manual_time_results.html", {
         "race": race,
         "entries": entries,
         "preview": preview,
-        "state": state, 
-        "attempt_numbers": attempt_numbers,   # ⭐ needed for attempts UI
+    })
+
+#----------------------------------------------------------#
+
+def timed_results(request, race_id):
+
+    race = get_object_or_404(Race, pk=race_id)
+
+    # Which attempt?
+    attempt = request.GET.get("attempt")
+    attempt = int(attempt) if attempt else None
+
+    state = build_race_state(race.id, attempt=attempt)
+
+    attempt_numbers = range(1, state["total_attempts"] + 1)
+
+    # Build a PREVIEW from event log (not DB)
+    preview = None
+
+    boats = list(state["boats"].values())
+
+    valid = [
+        b for b in boats
+        if b["laps"] and b["last"]
+    ]
+
+    if valid:
+        max_laps = max(b["laps"] for b in valid)
+
+        ranked = sorted(
+            valid,
+            key=lambda b: (
+                (b["last"] * (max_laps / b["laps"]) * 1000 / b["py"])
+                if b["py"] else 999999
+            )
+        )
+
+        preview = []
+
+        for pos, b in enumerate(ranked, 1):
+
+            corrected = (
+                b["last"] * (max_laps / b["laps"]) * 1000 / b["py"]
+                if b["py"] else None
+            )
+
+            preview.append({
+                "entry_id": b["entry_id"],
+                "helm": b["helm"],
+                "sail": b["sail"],
+                "laps": b["laps"],
+                "elapsed": b["last"],
+                "corrected": corrected,
+                "position": pos,
+            })
+
+    # ===============================
+    # SAVE RESULT SET
+    # ===============================
+
+    if request.method == "POST" and preview:
+
+        result_set = ResultSet.objects.create(
+            race=race,
+            source=ResultSet.Source.TIMED,
+            created_by=request.user,
+            state=ResultSet.State.SAVED,
+        )
+
+        for row in preview:
+            ResultSetEntry.objects.create(
+                result_set=result_set,
+                race_entry_id=row["entry_id"],
+                laps=row["laps"],
+                elapsed_seconds=row["elapsed"],
+                corrected_seconds=row["corrected"],
+                finish_position=row["position"],
+            )
+
+        messages.success(request, "Timed result set created.")
+        return redirect("select-result-set", race_id=race.id)
+
+    return render(request, "races/timed_results.html", {
+        "race": race,
+        "state": state,
+        "preview": preview,
+        "attempt_numbers": attempt_numbers,
     })

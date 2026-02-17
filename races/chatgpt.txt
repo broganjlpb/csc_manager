@@ -1,0 +1,33 @@
+If at any time you say “revert to before full event architecture”, I’ll treat that as the clean checkpoint before moving manual results into the event model.
+
+
+17/02 16:30
+ok, lets go the phased approach. Couple of points. 1. we have two methods of manual entry, i think they are two types of events. 
+The laps and finish time for each boat method has more detail and should be able to be selected as a seperate source of the truth from the pure manual ordering of the boats. 
+I think this will fit the current architecture. 
+When someone comes to promote the race to locked thenthey should be able to select from any of the race results irrespective of how and by who  they are entered. 
+We need that locked state, but since we will now be working with a history of events it should be possibel to have an unlock event. 
+If someone has unlocked the race then they or someone else should eb able to slect which set of results gets promoted. 
+This fits well with dispute resolution. 
+2. if we no the most recent state from the event history we should be able to clearly identify the state of the race and use thsi as part of the permissioning model. 
+person A can enter results for a race, Person B can also lock the result to be used, Person C can also unlock a race. 
+3. Perhaps we should revist race states whilst we are at it. How about these. 
+Created with no boats assigned = DRAFT, 
+at least one boat assigned = READY, 
+started countdown = COUNTDOWN, 
+race underway = LIVE, 
+race finished = TIMED, 
+race saved = FINISHED (goes direct to this if no queue), 
+manually entered and saved = FINISHED, selection of result to promote = PUBLISHED, unlocked for reselection and publishing = FINISHED (dont think we need a seperte state). 
+We should also allow for a race to be cancelled so that it does not remain in DRAFT for ever = CANCELLED
+
+
+Convert manual_results view
+Or build the Select Result Set to Publish screen
+Or unify Live + Results page
+
+We should now:
+Convert timed_results_edit to create MANUAL_TIME sets
+Build the Select Result Set to Publish screen
+Remove legacy RaceEntry result fields entirely
+Which direction do you want to go?

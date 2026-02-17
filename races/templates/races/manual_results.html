@@ -1,177 +1,165 @@
 {% extends "base.html" %}
-
 {% block content %}
+<style>
+.tied-row {
+    background-color: #fff3cd;
+}
 
-<div data-editing="{% if race.status != race.RaceStatus.FINISHED %}1{% else %}0{% endif %}">
+</style>
 
-<h3 class="mb-3">Manual Results – {{ race }}</h3>
+<h3>Manual Positions – {{ race }}</h3>
 
-<form method="post" id="results-form">
-    {% csrf_token %}
+<form method="post" id="manual-form">
+{% csrf_token %}
 
-    <ul id="finish-order" class="list-group mb-3">
-        {% for e in entries %}
-        <li class="list-group-item d-flex justify-content-between align-items-center
-            {% if e.result_status == "dnf" %} list-group-item-warning
-            {% elif e.result_status == "dsq" %} list-group-item-danger
-            {% endif %}"
-            data-id="{{ e.id }}">
+<table class="table table-sm">
+<thead>
+<tr>
+    <th></th>
+    <th>Boat</th>
+    <th>Helm</th>
+    <th>Tie With Above</th>
+</tr>
+</thead>
 
-            <div>
-                {% if race.status == race.RaceStatus.FINISHED %}
-                    <span class="badge bg-secondary ms-2">
-                        {{ e.points }} pts
-                    </span>
-                {% endif %}
-                <strong class="pos-number">{{ forloop.counter }}.</strong>
-                {{ e.boat }} – {{ e.helm.username }}
-                {% if e.crew %} & {{ e.crew.username }}{% endif %}
+<tbody id="sortable-body">
+{% for row in entries %}
+<tr data-id="{{ row.id }}"
+    class="{% if row.tied %}tied-row{% endif %}">
+    <td style="cursor:grab;">☰</td>
+    <td>{{ row.race_entry.boat }}</td>
+    <td>{{ row.race_entry.helm.username }}</td>
+    <td>
+        <input type="checkbox"
+            class="tie-checkbox"
+            {% if forloop.first %}disabled{% endif %}
+            {% if row.tied %}checked{% endif %}>
+    </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+{% if preview %}
+    <hr>
+
+    <h4 class="mt-4">Preview Final Positions</h4>
+
+    <table class="table table-bordered table-sm">
+        <thead class="table-light">
+            <tr>
+                <th>Pos</th>
                 
+                <th>Boat</th>
+                <th>Helm</th>
+                <th>Points</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in preview %}
+            <tr>
+                <td>
+                    <strong>{{ p.position }}</strong>
+                </td>
+                
+                <td>{{ p.row.race_entry.boat }}</td>
+                <td>{{ p.row.race_entry.helm.username }}</td>
+                <td><strong>{{ p.points }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
 
-            </div>
 
-            <div class="d-flex gap-2 align-items-center">
-                <span class="text-muted">⇅</span>
+<button name="action" value="save" class="btn btn-secondary">
+    Save
+</button>
 
-                <button type="button" class="btn btn-sm btn-outline-warning mark-dnf">
-                    DNF
-                </button>
-
-                <button type="button" class="btn btn-sm btn-outline-danger mark-dsq">
-                    DSQ
-                </button>
-            </div>
-
-        </li>
-        {% endfor %}
-    </ul>
-
-    {% if race.status != race.RaceStatus.FINISHED %}
-        <button class="btn btn-success">Save Results</button>
-    {% else %}
-        <a href="{% url 'race-results-edit' race.pk %}" class="btn btn-warning">
-            Edit Results
-        </a>
-    {% endif %}
+<button name="action" value="preview" class="btn btn-primary">
+    Preview
+</button>
 
 </form>
-
-</div>
-
 {% endblock %}
-
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", function() {
 
-    const wrapper = document.querySelector("[data-editing]");
-    const editing = wrapper?.dataset.editing === "1";
+    const form = document.getElementById("manual-form");
+    const sortableBody = document.getElementById("sortable-body");
 
-    const list = document.getElementById("finish-order");
-    const form = document.getElementById("results-form");
+    if (!sortableBody) return;  // safety guard
 
-    if (!list || !form) {
-        console.log("Missing list or form");
-        return;
-    }
-
-    // Holds DNF / DSQ selections
-    const specialResults = {};
-
-    // Rebuild state from DB colouring
-    list.querySelectorAll("li").forEach(li => {
-        const id = li.dataset.id;
-
-        if (li.classList.contains("list-group-item-warning")) {
-            specialResults[id] = "dnf";
-        }
-        if (li.classList.contains("list-group-item-danger")) {
-            specialResults[id] = "dsq";
-        }
+    Sortable.create(sortableBody, {
+        animation: 150,
+        onEnd: updateTieState
     });
 
-    // Renumber display
-    function renumber() {
-        list.querySelectorAll("li").forEach((li, index) => {
-            const num = li.querySelector(".pos-number");
-            if (num) num.textContent = (index + 1) + ".";
-        });
-    }
+    function updateTieState() {
+        const rows = sortableBody.querySelectorAll("tr");
 
-    // Enable drag only in edit mode
-    if (editing) {
-        Sortable.create(list, {
-            animation: 150,
-            onEnd: renumber,
-        });
-    }
+        rows.forEach((row, index) => {
+            const checkbox = row.querySelector(".tie-checkbox");
 
-    renumber();
-
-    // Toggle DNF / DSQ
-    if (editing) {
-
-        list.querySelectorAll(".mark-dnf").forEach(btn => {
-            btn.addEventListener("click", function () {
-                const li = this.closest("li");
-                const id = li.dataset.id;
-
-                if (specialResults[id] === "dnf") {
-                    delete specialResults[id];
-                    li.classList.remove("list-group-item-warning", "list-group-item-danger");
-                } else {
-                    specialResults[id] = "dnf";
-                    li.classList.remove("list-group-item-warning", "list-group-item-danger");
-                    li.classList.add("list-group-item-warning");
-                }
-            });
-        });
-
-        list.querySelectorAll(".mark-dsq").forEach(btn => {
-            btn.addEventListener("click", function () {
-                const li = this.closest("li");
-                const id = li.dataset.id;
-
-                if (specialResults[id] === "dsq") {
-                    delete specialResults[id];
-                    li.classList.remove("list-group-item-warning", "list-group-item-danger");
-                } else {
-                    specialResults[id] = "dsq";
-                    li.classList.remove("list-group-item-warning", "list-group-item-danger");
-                    li.classList.add("list-group-item-danger");
-                }
-            });
-        });
-    }
-
-    // Build POST payload
-    form.addEventListener("submit", function () {
-
-        let position = 1;
-
-        list.querySelectorAll("li").forEach(li => {
-            const id = li.dataset.id;
-
-            if (specialResults[id]) {
-                const input = document.createElement("input");
-                input.type = "hidden";
-                input.name = `status_${id}`;
-                input.value = specialResults[id];
-                form.appendChild(input);
+            if (index === 0) {
+                checkbox.checked = false;
+                checkbox.disabled = true;
+                row.classList.remove("tied-row");
             } else {
-                const posInput = document.createElement("input");
-                posInput.type = "hidden";
-                posInput.name = `position_${id}`;
-                posInput.value = position++;
-                form.appendChild(posInput);
+                checkbox.disabled = false;
+                if (checkbox.checked) {
+                    row.classList.add("tied-row");
+                } else {
+                    row.classList.remove("tied-row");
+                }
+            }
+        });
+    }
+
+    document.querySelectorAll(".tie-checkbox").forEach(cb => {
+        cb.addEventListener("change", updateTieState);
+    });
+
+    updateTieState();
+
+    form.addEventListener("submit", function(){
+
+        document.querySelectorAll(".generated-input").forEach(el => el.remove());
+
+        const rows = sortableBody.querySelectorAll("tr");
+
+        rows.forEach((row, index) => {
+
+            const id = row.dataset.id;
+            const tie = row.querySelector(".tie-checkbox").checked;
+
+            // Position
+            const posInput = document.createElement("input");
+            posInput.type = "hidden";
+            posInput.name = "pos_" + id;
+            posInput.value = index + 1;
+            posInput.classList.add("generated-input");
+            form.appendChild(posInput);
+
+            // Tie
+            if (tie) {
+                const tieInput = document.createElement("input");
+                tieInput.type = "hidden";
+                tieInput.name = "tie_" + id;
+                tieInput.value = "on";
+                tieInput.classList.add("generated-input");
+                form.appendChild(tieInput);
             }
         });
 
     });
 
 });
+
 </script>
+
 {% endblock %}

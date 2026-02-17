@@ -2,15 +2,11 @@
 {% block content %}
 
 <h3>Timed Results – {{ race }}</h3>
-<!-- {{ race.status }}
-PREVIEW = {{ preview|default:"NONE" }} -->
 
+<!-- Attempt selector -->
+{% if state.total_attempts > 1 %}
 <div class="mb-3">
-    Attempts:
-    {% for i in state.total_attempts|make_list %}
-    {% endfor %}
-</div>
-<div class="mb-3">
+    <strong>Attempts:</strong>
     {% for i in attempt_numbers %}
         <a href="?attempt={{ i }}"
            class="btn btn-sm {% if i == state.attempt %}btn-primary{% else %}btn-outline-primary{% endif %}">
@@ -18,172 +14,59 @@ PREVIEW = {{ preview|default:"NONE" }} -->
         </a>
     {% endfor %}
 </div>
+{% endif %}
 
-<form method="post" id="timed-form">
-{% csrf_token %}
 
-<table class="table table-sm align-middle">
-<thead>
-<tr>
-    <th>Boat</th>
-    <th>Helm</th>
-    <th>Laps</th>
-    <th>Time</th>
+{% if preview %}
 
-    {% if preview %}
-        <th>Corrected</th>
-        <th>Pos</th>
-    {% endif %}
-
-    <th></th>
-</tr>
-</thead>
-
-<tbody>
-{% for e in entries %}
-<tr id="row-{{ e.id }}"
-    class="
-    {% if e.result_status == 'dnf' %} table-warning
-    {% elif e.result_status == 'dsq' %} table-danger
-    {% endif %}
-    ">
-
-    <td>{{ e.boat }}</td>
-    <td>{{ e.helm.username }}</td>
-
-    <td>
-        <input type="number" name="laps_{{ e.id }}"
-               value="{{ e.laps|default_if_none:'' }}" class="form-control">
-    </td>
-
-    <td>
-        <div class="d-flex gap-1">
-            <input type="number" min="0" placeholder="hh"
-                name="h_{{ e.id }}" value="{{ e.h }}" class="form-control form-control-sm">
-            <input type="number" min="0" max="59" placeholder="mm"
-                name="m_{{ e.id }}" value="{{ e.m }}" class="form-control form-control-sm">
-            <input type="number" min="0" max="59" placeholder="ss"
-                name="s_{{ e.id }}" value="{{ e.s }}" class="form-control form-control-sm">
-        </div>
-    </td>
-
-    {% if preview %}
-        {% with row=preview|dictsort:"entry.id" %}
-        {% endwith %}
-
-        {% for p in preview %}
-            {% if p.entry.id == e.id %}
-                <!-- <td>{{ p.corrected|floatformat:1 }}</td> -->
-                <td>{{ p.corrected }}</td>
-                <td><strong>{{ p.position }}</strong></td>
-            {% endif %}
+<table class="table table-sm table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Pos</th>
+            <th>Boat</th>
+            <th>Helm</th>
+            <th>Laps</th>
+            <th>Elapsed</th>
+            <th>Corrected</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in preview %}
+        <tr>
+            <td><strong>{{ row.position }}</strong></td>
+            <td>
+                {{ row.sail }}
+            </td>
+            <td>
+                {{ row.helm }}
+            </td>
+            <td>
+                {{ row.laps }}
+            </td>
+            <td>
+                {{ row.elapsed|floatformat:0 }}
+            </td>
+            <td>
+                {{ row.corrected|floatformat:1 }}
+            </td>
+        </tr>
         {% endfor %}
-    {% endif %}
-
-    <td>
-        <div class="d-flex gap-2">
-            <button type="button"
-                    class="btn btn-sm btn-outline-warning mark-dnf"
-                    data-id="{{ e.id }}">
-                DNF
-            </button>
-
-            <button type="button"
-                    class="btn btn-sm btn-outline-danger mark-dsq"
-                    data-id="{{ e.id }}">
-                DSQ
-            </button>
-            
-        </div>
-    </td>
-
-</tr>
-{% endfor %}
-</tbody>
+    </tbody>
 </table>
 
-{% if race.status != race.RaceStatus.FINISHED %}
-    <button name="action" value="save" class="btn btn-secondary">
-        Save
+<form method="post" class="mt-3">
+    {% csrf_token %}
+    <button class="btn btn-success">
+        Save Timed Result Set
     </button>
-
-    <button name="action" value="preview" class="btn btn-primary">
-        Preview
-    </button>
-
-    {% if preview %}
-        <button name="action" value="confirm" class="btn btn-success">
-            Confirm & Finish
-        </button>
-    {% endif %}
-
-    
-{% endif %}
-{% if race.status == race.RaceStatus.FINISHED %}
-    <a href="{% url 'race-results-timed-edit' race.pk %}"
-    class="btn btn-warning">
-        Edit Results
-    </a>
-{% endif %}
-
 </form>
 
-{% endblock %}
+{% else %}
 
-{% block extra_js %}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
+<div class="alert alert-warning mt-3">
+    No valid laps recorded for this attempt.
+</div>
 
-    const form = document.getElementById("timed-form");
-    const special = {};
+{% endif %}
 
-    // preload from DB
-    document.querySelectorAll("tr.table-warning").forEach(row => {
-        special[row.id.replace("row-", "")] = "dnf";
-    });
-
-    document.querySelectorAll("tr.table-danger").forEach(row => {
-        special[row.id.replace("row-", "")] = "dsq";
-    });
-
-    function toggle(row, id, type) {
-        if (special[id] === type) {
-            delete special[id];
-            row.classList.remove("table-warning", "table-danger");
-        } else {
-            special[id] = type;
-            row.classList.remove("table-warning", "table-danger");
-            row.classList.add(type === "dnf" ? "table-warning" : "table-danger");
-        }
-    }
-
-    document.querySelectorAll(".mark-dnf").forEach(btn => {
-        btn.addEventListener("click", function () {
-            const id = this.dataset.id;
-            const row = document.getElementById("row-" + id);
-            toggle(row, id, "dnf");
-        });
-    });
-
-    document.querySelectorAll(".mark-dsq").forEach(btn => {
-        btn.addEventListener("click", function () {
-            const id = this.dataset.id;
-            const row = document.getElementById("row-" + id);
-            toggle(row, id, "dsq");
-        });
-    });
-
-    // send to backend
-    form.addEventListener("submit", function () {
-        Object.entries(special).forEach(([id, value]) => {
-            const input = document.createElement("input");
-            input.type = "hidden";
-            input.name = `status_${id}`;
-            input.value = value;
-            form.appendChild(input);
-        });
-    });
-
-});
-</script>
 {% endblock %}

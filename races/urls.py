@@ -34,7 +34,8 @@ urlpatterns = [
     path("leagues/<int:pk>/table/", league_table, name="league-table"),
     path("leagues/active/", active_leagues, name="active-leagues"),
 
-    path("<int:pk>/results/timed/", timed_results, name="race-results-timed"),
+    # path("<int:pk>/results/timed/", timed_results, name="race-results-timed"),
+    path("<int:race_id>/results/timed/", timed_results, name="race-results-timed"),
     path("<int:pk>/results/timed/edit/", timed_results_edit, name="race-results-timed-edit"),
 
     path("<int:pk>/timer/", race_timer, name="race-timer"),

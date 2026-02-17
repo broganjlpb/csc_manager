@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
-
+import uuid
 
 class BoatType(models.Model):
     name = models.CharField(max_length=100)
@@ -126,22 +126,12 @@ class RaceEntry(models.Model):
     # snapshot fields ⭐⭐⭐
     boat_type_name = models.CharField(max_length=200)
     py_used = models.IntegerField()
-    finish_position = models.PositiveIntegerField(null=True, blank=True)
-
-    laps = models.PositiveIntegerField(null=True, blank=True)
-    elapsed_seconds = models.PositiveIntegerField(null=True, blank=True)
-
+    
     class ResultStatus(models.TextChoices):
         FINISHED = "finished", "Finished"
         DNF = "dnf", "Did Not Finish"
         DSQ = "dsq", "Disqualified"
 
-
-    result_status = models.CharField(
-        max_length=20,
-        choices=ResultStatus.choices,
-        default=ResultStatus.FINISHED,
-    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -207,6 +197,74 @@ class RaceEvent(models.Model):
     class Meta:
         unique_together = ("device_id", "sequence")
         ordering = ["sequence"]
+
+class ResultSet(models.Model):
+
+    class Source(models.TextChoices):
+        TIMED = "timed", "Timed from Event Log"
+        MANUAL_TIME = "manual_time", "Manual Laps & Time"
+        MANUAL_POSITION = "manual_position", "Manual Positions Only"
+
+    class State(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SAVED = "saved", "Saved"
+        PUBLISHED = "published", "Published"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    race = models.ForeignKey(
+        "Race",
+        on_delete=models.CASCADE,
+        related_name="result_sets"
+    )
+
+    source = models.CharField(max_length=50, choices=Source.choices)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    state = models.CharField(
+        max_length=20,
+        choices=State.choices,
+        default=State.DRAFT
+    )
+
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["race", "created_by", "source"],
+                name="unique_resultset_per_user_source"
+            )
+        ]
+
+
+    def __str__(self):
+        return f"{self.race} - {self.source} - {self.created_at}"
+
+class ResultSetEntry(models.Model):
+
+    result_set = models.ForeignKey(
+        ResultSet,
+        on_delete=models.CASCADE,
+        related_name="entries"
+    )
+
+    race_entry = models.ForeignKey(
+        "RaceEntry",
+        on_delete=models.PROTECT
+    )
+
+    laps = models.IntegerField(null=True, blank=True)
+    elapsed_seconds = models.IntegerField(null=True, blank=True)
+    finish_position = models.IntegerField(null=True, blank=True)
+    tied = models.BooleanField(default=False)
+    corrected_seconds = models.FloatField(null=True, blank=True)
 
 
 
