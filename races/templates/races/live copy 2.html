@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Live Race{% endblock %}
+
+{% block content %}
+<h1>Live Race</h1>
+
+<h2 class="mb-3">{{ race }}</h2>
+<div id="attempts" class="mb-3"></div>
+<div id="race-status" class="alert alert-secondary"></div>
+<div id="race-clock" class="mb-2 fw-bold"></div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Corr</th>
+            <th>Helm</th>
+            <th>Sail</th>
+            <th>Class</th>
+            <th>PY</th>
+            <th>Laps</th>
+            <th>Last</th>
+            <th>Actual</th>
+        </tr>
+    </thead>
+    <tbody id="live-body"></tbody>
+</table>
+
+<h3 class="mt-4">Position Chart</h3>
+<canvas id="positionChart" height="120"></canvas>
+
+<div class="btn-group mt-2">
+    <button id="mode-actual" class="btn btn-sm btn-primary">Actual</button>
+    <button id="mode-corrected" class="btn btn-sm btn-outline-primary">Corrected</button>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+
+let chart = null;
+let mode = "actual";   // 🔥 global mode
+
+function fmt(sec){
+    if(sec == null) return "--";
+    const m = Math.floor(sec/60);
+    const s = Math.floor(sec%60);
+    return `${m}:${s.toString().padStart(2,"0")}`;
+}
+
+let currentAttempt = null;
+const STATE_URL = "{% url 'live_state' race.id %}";
+
+function load(){
+
+    let url = STATE_URL;
+    if(currentAttempt){
+        url += "?attempt=" + currentAttempt;
+    }
+
+    fetch(url)
+    .then(r => {
+        if(!r.ok) throw new Error("bad response");
+        return r.json();
+    })
+    .then(data => {
+
+        // ================================
+        // STATUS
+        // ================================
+        const banner = document.getElementById("race-status");
+        const clock = document.getElementById("race-clock");
+
+        if(!data.started){
+            banner.className = "alert alert-secondary";
+            banner.textContent = "Not started";
+            clock.textContent = "";
+        }
+        else if(data.finished){
+            banner.className = "alert alert-dark";
+            banner.textContent = "Finished";
+            clock.textContent = `Race Time ${fmt(data.race_time)}`;
+        }
+        else{
+            banner.className = "alert alert-success";
+            banner.textContent = "Racing";
+            clock.textContent = `Elapsed ${fmt(data.race_time)}`;
+        }
+
+        // ================================
+        // ATTEMPTS
+        // ================================
+        const attemptsDiv = document.getElementById("attempts");
+        attemptsDiv.innerHTML = "";
+
+        for(let i=1;i<=data.total_attempts;i++){
+            const btn = document.createElement("button");
+            btn.className = "btn btn-sm me-1 " +
+                (i === data.attempt ? "btn-primary" : "btn-outline-primary");
+            btn.textContent = i;
+
+            btn.onclick = () => {
+                currentAttempt = i;
+                load();
+            };
+
+            attemptsDiv.appendChild(btn);
+        }
+
+        // ================================
+        // TABLE
+        // ================================
+        const body = document.getElementById("live-body");
+        body.innerHTML = "";
+
+        const boats = Object.values(data.boats);
+        boats.sort((a,b) => a.corrected_pos - b.corrected_pos);
+
+        boats.forEach(b => {
+            body.innerHTML += `
+                <tr>
+                    <td>${b.corrected_pos}</td>
+                    <td>${b.helm}</td>
+                    <td>${b.sail}</td>
+                    <td>${b.boat_class || ""}</td>
+                    <td>${b.py}</td>
+                    <td>${b.laps}</td>
+                    <td>${fmt(b.last)}</td>
+                    <td>${b.actual_pos}</td>
+                </tr>
+            `;
+        });
+
+        drawChart(data);   // 🔥 redraw using current mode
+
+    })
+    .catch(e => console.log("LIVE LOAD FAIL", e));
+}
+
+load();
+setInterval(load, 2000);
+
+
+
+// =========================================
+// MODE TOGGLE
+// =========================================
+
+document.getElementById("mode-actual").onclick = function(){
+    mode = "actual";
+    this.classList.add("btn-primary");
+    this.classList.remove("btn-outline-primary");
+
+    const other = document.getElementById("mode-corrected");
+    other.classList.remove("btn-primary");
+    other.classList.add("btn-outline-primary");
+
+    load();   // 🔥 re-render
+};
+
+document.getElementById("mode-corrected").onclick = function(){
+    mode = "corrected";
+    this.classList.add("btn-primary");
+    this.classList.remove("btn-outline-primary");
+
+    const other = document.getElementById("mode-actual");
+    other.classList.remove("btn-primary");
+    other.classList.add("btn-outline-primary");
+
+    load();   // 🔥 re-render
+};
+
+
+// =========================================
+// CHART
+// =========================================
+
+function buildDatasets(data, mode) {
+
+    const boats = Object.values(data.boats);
+    const history = data.history || [];
+
+    return boats.map(b => {
+
+        const points = history
+            .filter(h => h.trigger === b.entry_id)  // 🔥 KEY LINE
+            .map(h => ({
+                x: h.time,
+                y: h.boats[b.entry_id]
+                    ? h.boats[b.entry_id][mode + "_pos"]
+                    : null
+            }));
+
+        return {
+            label: b.helm,
+            data: points,
+            fill: false,
+            tension: 0
+        };
+    });
+}
+
+function drawChart(data){
+
+    if(!data.history || !data.history.length) return;
+
+    if(chart) chart.destroy();   // 🔥 critical
+
+    const ctx = document.getElementById("positionChart");
+
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: buildDatasets(data, mode)
+        },
+        options: {
+            parsing: false,
+            animation: false,
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'linear',
+                    min: 0,
+                    max: data.race_time,
+                    title: { display: true, text: "Race Time (seconds)" }
+                },
+                y: {
+                    reverse: true,
+                    beginAtZero: false,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+</script>
+{% endblock %}
+

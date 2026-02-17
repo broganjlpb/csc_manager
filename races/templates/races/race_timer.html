@@ -166,6 +166,36 @@ const lapButtons = document.querySelectorAll(".lap-btn");
 let currentPredictions = [];
 
 /* =====================================================
+   LAP BEEPS
+===================================================== */
+
+let audioCtx = null;
+
+function beep(freq = 880, duration = 0.08) {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = freq;
+
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    gain.gain.value = 0.1; // volume (0–1)
+
+    oscillator.start();
+
+    setTimeout(() => {
+        oscillator.stop();
+    }, duration * 1000);
+}
+
+
+/* =====================================================
    SYNC
 ===================================================== */
 let deviceId = localStorage.getItem("device_id");
@@ -403,6 +433,8 @@ lapButtons.forEach(btn => {
         if (!startTime) return;
 
         const sec = Math.floor((Date.now() - startTime) / 1000);
+        
+        beep();   // 🔊 ADD THIS LINE
 
         lapData[id].laps++;
         lapData[id].times.push(sec);

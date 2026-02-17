@@ -6,6 +6,7 @@ from .models import BoatType, RegisteredBoat, League, Race, RaceEntry, RaceResul
 from members.models import Member
 from .forms import BoatTypeForm, RegisteredBoatForm, LeagueForm, RaceEntryForm, RaceEntry, RaceCreateForm
 from django.utils import timezone
+from django.db.models import Exists, OuterRef
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django import forms
 from django.views.decorators.http import require_http_methods
@@ -205,6 +206,16 @@ class RaceListView(ListView):
 
         if status and status != "all":
             qs = qs.filter(status=status)
+
+        qs = qs.annotate(
+            has_events=Exists(
+                # RaceEvent.objects.filter(race=OuterRef("pk"))
+                RaceEvent.objects.filter(
+                    race=OuterRef("pk"),
+                    event_type="start"
+                )
+            )
+        )
 
         return qs
 

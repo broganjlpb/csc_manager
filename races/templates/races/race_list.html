@@ -67,10 +67,20 @@
                            class="btn btn-sm btn-outline-primary">
                            Entries
                         </a>
-                        <a href="{% url 'race-results-manual' race.pk %}"
+                        <!-- <a href="{% url 'race-results-manual' race.pk %}"
                             class="btn btn-sm btn-outline-success">
                             Enter Manual Results
-                        </a>
+                        </a> -->
+                        {% if race.has_events %}
+                        <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-success">
+                                Live
+                            </a>
+                        {% else %}
+                            <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-outline-primary">
+                                Live
+                            </a>
+                        {% endif %}
+                        
 
                     </td>
                 </tr>
