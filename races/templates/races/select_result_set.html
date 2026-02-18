@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Select Result Set – {{ race }}</h3>
+
+{% if published %}
+<div class="alert alert-success">
+    Official Result:
+    <strong>{{ published.get_source_display }}</strong>
+    by {{ published.created_by }}
+</div>
+{% endif %}
+
+<h5 class="mt-4">My Result Sets</h5>
+
+<table class="table table-sm table-striped">
+<thead>
+<tr>
+    <th>Source</th>
+    <th>Created</th>
+    <th>Status</th>
+    <th></th>
+</tr>
+</thead>
+<tbody>
+{% for rs in my_sets %}
+<tr>
+    <td>{{ rs.get_source_display }}</td>
+    <td>{{ rs.created_at }}</td>
+    <td>
+        {% if rs.state == "published" %}
+            <span class="badge bg-success">Published</span>
+        {% else %}
+            <span class="badge bg-secondary">{{ rs.state|title }}</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if rs.state != "published" %}
+        <a href="{% url 'publish-result-set' rs.id %}"
+           class="btn btn-sm btn-success">
+            Publish
+        </a>
+        {% endif %}
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="4">No result sets yet.</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+
+{% if other_sets %}
+<hr>
+
+<h5>Other Users</h5>
+
+<table class="table table-sm table-bordered">
+<thead>
+<tr>
+    <th>User</th>
+    <th>Source</th>
+    <th>Created</th>
+    <th>Status</th>
+    <th></th>
+</tr>
+</thead>
+<tbody>
+{% for rs in other_sets %}
+<tr>
+    <td>{{ rs.created_by }}</td>
+    <td>{{ rs.get_source_display }}</td>
+    <td>{{ rs.created_at }}</td>
+    <td>
+        {% if rs.state == "published" %}
+            <span class="badge bg-success">Published</span>
+        {% else %}
+            <span class="badge bg-secondary">{{ rs.state|title }}</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if rs.state != "published" %}
+        <a href="{% url 'publish-result-set' rs.id %}"
+           class="btn btn-sm btn-outline-success">
+            Publish
+        </a>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+{% endif %}
+
+{% endblock %}

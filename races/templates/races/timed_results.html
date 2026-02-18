@@ -19,53 +19,46 @@
 
 {% if preview %}
 
-<table class="table table-sm table-striped align-middle">
-    <thead>
-        <tr>
-            <th>Pos</th>
-            <th>Boat</th>
-            <th>Helm</th>
-            <th>Laps</th>
-            <th>Elapsed</th>
-            <th>Corrected</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in preview %}
-        <tr>
-            <td><strong>{{ row.position }}</strong></td>
-            <td>
-                {{ row.sail }}
-            </td>
-            <td>
-                {{ row.helm }}
-            </td>
-            <td>
-                {{ row.laps }}
-            </td>
-            <td>
-                {{ row.elapsed|floatformat:0 }}
-            </td>
-            <td>
-                {{ row.corrected|floatformat:1 }}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Pos</th>
+                <th>Boat</th>
+                <th>Helm</th>
+                <th>Laps</th>
+                <th>Elapsed</th>
+                <th>Corrected</th>
+                <!-- <th>Points</th> -->
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in preview %}
+            <tr>
+                <td><strong>{{ row.position }}</strong></td>
+                <td>{{ row.sail }}</td>
+                <td>{{ row.helm }}</td>
+                <td>{{ row.laps }}</td>
+                <td>{{ row.elapsed|floatformat:0 }}</td>
+                <td>{{ row.corrected|floatformat:1 }}</td>
+                <!-- <td>{{ row.points }}</td> -->
+                
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 
-<form method="post" class="mt-3">
-    {% csrf_token %}
-    <button class="btn btn-success">
-        Save Timed Result Set
-    </button>
-</form>
+    <form method="post" class="mt-3">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success">
+            Save Result Set
+        </button>
+    </form>
 
 {% else %}
 
-<div class="alert alert-warning mt-3">
-    No valid laps recorded for this attempt.
-</div>
+    <div class="alert alert-warning mt-3">
+        No valid laps recorded for this attempt.
+    </div>
 
 {% endif %}
 

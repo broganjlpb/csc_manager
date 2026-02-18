@@ -385,3 +385,50 @@ def copy_entries(source, target):
         )
 
 #----------------------------------------------------------#
+
+def build_manual_time_preview(entries):
+
+    max_laps = max(e.laps for e in entries)
+
+    temp = []
+
+    for e in entries:
+        corrected = (
+            e.elapsed_seconds * (max_laps / e.laps) * 1000 / e.py_used
+            if e.py_used else None
+        )
+
+        temp.append({
+            "entry": e,
+            "corrected_raw": corrected
+        })
+
+    ranked = sorted(
+        temp,
+        key=lambda x: x["corrected_raw"] if x["corrected_raw"] else 999999
+    )
+
+    preview = []
+
+    last_corrected = None
+    display_position = 0
+
+    for index, r in enumerate(ranked, start=1):
+
+        if last_corrected is None:
+            display_position = 1
+        elif r["corrected_raw"] != last_corrected:
+            display_position = index
+
+        preview.append({
+            "entry": r["entry"],
+            "position": display_position,
+            "corrected": format_seconds(r["corrected_raw"]),
+            "corrected_raw": r["corrected_raw"],
+            "points": calculate_points(display_position),
+        })
+
+        last_corrected = r["corrected_raw"]
+
+    return preview
+
