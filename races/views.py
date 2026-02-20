@@ -1072,6 +1072,8 @@ def select_result_set(request, race_id):
         "published": published,
     })
 
+
+
 #----------------------------------------------------------#
 
 def publish_result_set(request, result_set_id):
