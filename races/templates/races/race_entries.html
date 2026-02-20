@@ -36,28 +36,28 @@
                 <div class="row g-2 align-items-end">
 
                     <div class="col-12 col-md-3">
-                        <div class="form-floating">
+                        <div class="form-floating compact">
                             {{ form.helm }}
                             <label for="{{ form.helm.id_for_label }}">Helm</label>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-3">
-                        <div class="form-floating">
+                        <div class="form-floating compact">
                             {{ form.crew }}
                             <label for="{{ form.crew.id_for_label }}">Crew</label>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-3">
-                        <div class="form-floating">
+                        <div class="form-floating compact">
                             {{ form.boat }}
                             <label for="{{ form.boat.id_for_label }}">Boat</label>
                         </div>
                     </div>
 
                     <div class="col-6 col-md-2">
-                        <div class="form-floating">
+                        <div class="form-floating compact">
                             {{ form.py_used }}
                             <label for="{{ form.py_used.id_for_label }}">PY</label>
                         </div>
@@ -124,17 +124,21 @@
                     <td>{{ e.helm.username }}</td>
                     <td>{{ e.crew.username|default:"—" }}</td>
                     <td>{{ e.py_used }}</td>
-                    <td class="text-end">
+                    <td class="text-end text-nowrap">
+
                         <a href="{% url 'race-entry-edit' race.pk e.pk %}"
-                        class="btn btn-sm btn-outline-secondary">
-                            Edit
+                        class="btn btn-sm btn-outline-secondary btn-icon"
+                        title="Edit entry">
+                            <i class="bi bi-pencil"></i>
                         </a>
+
                         <a href="{% url 'race-entry-delete' race.pk e.pk %}"
-                        class="btn btn-sm btn-outline-danger"
+                        class="btn btn-sm btn-outline-danger btn-icon"
+                        title="Remove entry"
                         onclick="return confirm('Remove this entry?');">
-                            Remove
+                            <i class="bi bi-trash"></i>
                         </a>
-                        
+
                     </td>
                 </tr>
             {% empty %}

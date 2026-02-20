@@ -13,6 +13,7 @@
     {% bootstrap_javascript %}
     <!-- img/csc_logo_cropped.png img/favicon_32.png -->
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/csc_logo_cropped.png' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
    
 
     <style>
@@ -100,6 +101,29 @@
             padding: 0.4rem 0.75rem;
             font-size: 0.85rem;
         }
+
+        .form-floating.compact > .form-select,
+        .form-floating.compact > .form-control {
+            padding-top: 0.7rem;
+            padding-bottom: 0.2rem;
+            height: calc(2.2rem + 2px);
+            min-height: calc(2.2rem + 2px);
+        }
+
+        .form-floating.compact > label {
+            padding: 0.25rem 0.65rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-icon {
+            padding: 0.25rem 0.4rem;
+            line-height: 1;
+        }
+
+        .btn-icon i {
+            font-size: 0.9rem;
+        }
+      
     </style>
 
     {% block extra_css %}{% endblock %}
