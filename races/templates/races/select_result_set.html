@@ -5,94 +5,294 @@
 
 {% if published %}
 <div class="alert alert-success">
-    Official Result:
-    <strong>{{ published.get_source_display }}</strong>
-    by {{ published.created_by }}
+    <strong>Official Result:</strong>
+    {{ published.get_source_display }}
+    by {{ published.created_by.username }}
+    on {{ published.published_at|date:"d M Y H:i" }}
 </div>
 {% endif %}
 
+
+<!-- ========================= -->
+<!-- MY RESULT SETS -->
+<!-- ========================= -->
+
 <h5 class="mt-4">My Result Sets</h5>
 
-<table class="table table-sm table-striped">
-<thead>
-<tr>
-    <th>Source</th>
-    <th>Created</th>
-    <th>Status</th>
-    <th></th>
-</tr>
-</thead>
-<tbody>
-{% for rs in my_sets %}
-<tr>
-    <td>{{ rs.get_source_display }}</td>
-    <td>{{ rs.created_at }}</td>
-    <td>
-        {% if rs.state == "published" %}
-            <span class="badge bg-success">Published</span>
-        {% else %}
-            <span class="badge bg-secondary">{{ rs.state|title }}</span>
-        {% endif %}
-    </td>
-    <td>
-        {% if rs.state != "published" %}
-        <a href="{% url 'publish-result-set' rs.id %}"
-           class="btn btn-sm btn-success">
-            Publish
-        </a>
-        {% endif %}
-    </td>
-</tr>
-{% empty %}
-<tr>
-    <td colspan="4">No result sets yet.</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
+<div class="accordion" id="myResultsAccordion">
 
+{% for rs in my_sets %}
+
+<div class="accordion-item">
+
+    <h2 class="accordion-header" id="heading{{ rs.id }}">
+        <button class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapse{{ rs.id }}"
+                aria-expanded="false">
+
+            <strong>{{ rs.get_source_display }}</strong>
+            &nbsp;— {{ rs.created_at|date:"d M Y H:i" }}
+
+            {% if rs.state == "published" %}
+                <span class="badge bg-success ms-2">Published</span>
+            {% elif rs.state == "saved" %}
+                <span class="badge bg-secondary ms-2">Saved</span>
+            {% else %}
+                <span class="badge bg-light text-dark ms-2">Draft</span>
+            {% endif %}
+            
+
+        </button>
+    </h2>
+
+    <div id="collapse{{ rs.id }}"
+         class="accordion-collapse collapse"
+         data-rs="{{ rs.id }}"
+         data-bs-parent="">
+
+        <div class="accordion-body">
+
+            <!-- ================= PREVIEW ================= -->
+
+            {% if rs.source == "manual_position" or rs.source == "manual_time" %}
+                {% include "races/partials/result_table_preview.html" %}
+            {% elif rs.source == "timed" %}
+                {% include "races/partials/result_timed_preview.html" %}
+            {% endif %}
+
+            <hr>
+
+            {% if rs.state == "published" %}
+                <form method="post" action="{% url 'unpublish-result-set' rs.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-warning">
+                        Unpublish
+                    </button>
+                </form>
+            {% else %}
+                <form method="post" action="{% url 'publish-result-set' rs.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-primary">
+                        Publish
+                    </button>
+                </form>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{% empty %}
+<div class="alert alert-secondary">
+    You have not created any result sets yet.
+</div>
+{% endfor %}
+
+</div>
+
+
+<!-- ========================= -->
+<!-- OTHER USERS -->
+<!-- ========================= -->
 
 {% if other_sets %}
 <hr>
-
 <h5>Other Users</h5>
 
-<table class="table table-sm table-bordered">
-<thead>
-<tr>
-    <th>User</th>
-    <th>Source</th>
-    <th>Created</th>
-    <th>Status</th>
-    <th></th>
-</tr>
-</thead>
-<tbody>
-{% for rs in other_sets %}
-<tr>
-    <td>{{ rs.created_by }}</td>
-    <td>{{ rs.get_source_display }}</td>
-    <td>{{ rs.created_at }}</td>
-    <td>
-        {% if rs.state == "published" %}
-            <span class="badge bg-success">Published</span>
-        {% else %}
-            <span class="badge bg-secondary">{{ rs.state|title }}</span>
-        {% endif %}
-    </td>
-    <td>
-        {% if rs.state != "published" %}
-        <a href="{% url 'publish-result-set' rs.id %}"
-           class="btn btn-sm btn-outline-success">
-            Publish
-        </a>
-        {% endif %}
-    </td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
+<div class="accordion" id="otherResultsAccordion">
 
+{% for rs in other_sets %}
+
+<div class="accordion-item">
+
+    <h2 class="accordion-header" id="headingOther{{ rs.id }}">
+        <button class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseOther{{ rs.id }}"
+                aria-expanded="false">
+
+            <strong>{{ rs.get_source_display }}</strong>
+            — {{ rs.created_by.username }}
+            — {{ rs.created_at|date:"d M Y H:i" }}
+
+            {% if rs.state == "published" %}
+                <span class="badge bg-success ms-2">Published</span>
+            {% elif rs.state == "saved" %}
+                <span class="badge bg-secondary ms-2">Saved</span>
+            {% endif %}
+
+        </button>
+    </h2>
+
+    <div id="collapseOther{{ rs.id }}"
+         class="accordion-collapse collapse"
+         data-rs="{{ rs.id }}"
+         data-bs-parent="">
+
+        <div class="accordion-body">
+
+            {% if rs.source == "manual_position" or rs.source == "manual_time" %}
+                {% include "races/partials/result_table_preview.html" %}
+            {% elif rs.source == "timed" %}
+                {% include "races/partials/result_timed_preview.html" %}
+            {% endif %}
+            <hr>
+
+            {% if rs.state == "published" %}
+                <form method="post" action="{% url 'unpublish-result-set' rs.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-warning">
+                        Unpublish
+                    </button>
+                </form>
+            {% else %}
+                <form method="post" action="{% url 'publish-result-set' rs.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-primary">
+                        Publish
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+{% endfor %}
+
+</div>
 {% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+
+    const charts = {};      // store chart instances
+    const chartModes = {};  // store mode per result set
+
+    document.querySelectorAll(".accordion-collapse").forEach(collapse => {
+
+        collapse.addEventListener("shown.bs.collapse", function(){
+
+            const rsId = this.getAttribute("data-rs");
+            const canvas = document.getElementById("chart" + rsId);
+
+            if (!canvas) return;
+
+            if (charts[rsId]) return;  // already built
+
+            chartModes[rsId] = "corrected";  // default
+
+            fetch(`/races/{{ race.id }}/live/state/?result_set=${rsId}`)
+                .then(r => r.json())
+                .then(data => {
+                    charts[rsId] = buildChart(data, canvas, chartModes[rsId]);
+                });
+
+        });
+
+    });
+
+    // =========================
+    // TOGGLE HANDLER
+    // =========================
+
+    document.addEventListener("click", function(e){
+
+        if (!e.target.classList.contains("toggle-mode")) return;
+
+        const rsId = e.target.getAttribute("data-rs");
+        const mode = e.target.getAttribute("data-mode");
+
+        chartModes[rsId] = mode;
+
+        // Button styling
+        document.querySelectorAll(`.toggle-mode[data-rs="${rsId}"]`)
+            .forEach(btn => {
+                btn.classList.remove("btn-primary");
+                btn.classList.add("btn-outline-primary");
+            });
+
+        e.target.classList.remove("btn-outline-primary");
+        e.target.classList.add("btn-primary");
+
+        // Rebuild chart
+        fetch(`/races/{{ race.id }}/live/state/?result_set=${rsId}`)
+            .then(r => r.json())
+            .then(data => {
+
+                charts[rsId].destroy();
+                charts[rsId] = buildChart(
+                    data,
+                    document.getElementById("chart" + rsId),
+                    mode
+                );
+
+            });
+
+    });
+
+});
+
+
+function buildChart(data, canvas, mode){
+
+    const datasets = Object.values(data.boats).map(b => {
+
+        const points = data.history.map(h => ({
+            x: h.time,
+            y: h.boats[b.entry_id]
+                ? h.boats[b.entry_id][mode + "_pos"]
+                : null
+        }));
+
+        return {
+            label: b.helm,
+            data: points,
+            tension: 0
+        };
+    });
+
+    return new Chart(canvas, {
+        type: 'line',
+        data: { datasets: datasets },
+        options: {
+            parsing: false,
+            animation: false,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: { display: true, text: "Race Time (seconds)" }
+                },
+                y: {
+                    reverse: true,
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+}
+
+</script>
+
 
 {% endblock %}

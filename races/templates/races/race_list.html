@@ -64,13 +64,14 @@
                     <td class="text-end">
 
                         <a href="{% url 'race-entries' race.pk %}"
-                           class="btn btn-sm btn-outline-primary">
+                           class="btn btn-sm btn-outline-secondary">
                            Entries
                         </a>
-                        <!-- <a href="{% url 'race-results-manual' race.pk %}"
-                            class="btn btn-sm btn-outline-success">
-                            Enter Manual Results
-                        </a> -->
+                       
+                        <a href="{% url 'select-result-set' race.id %}"
+                            class="btn btn-sm btn-outline-primary">
+                            Results
+                        </a>
                         {% if race.has_events %}
                         <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-success">
                                 Live
@@ -81,7 +82,6 @@
                             </a>
                         {% endif %}
                         
-
                     </td>
                 </tr>
             {% empty %}

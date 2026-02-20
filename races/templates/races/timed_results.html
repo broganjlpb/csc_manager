@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load race_extras %}
 {% block content %}
 
 <h3>Timed Results – {{ race }}</h3>
@@ -38,8 +39,8 @@
                 <td>{{ row.sail }}</td>
                 <td>{{ row.helm }}</td>
                 <td>{{ row.laps }}</td>
-                <td>{{ row.elapsed|floatformat:0 }}</td>
-                <td>{{ row.corrected|floatformat:1 }}</td>
+                <td>{{ row.elapsed|format_time }}</td>
+                <td>{{ row.corrected|format_time }}</td>
                 <!-- <td>{{ row.points }}</td> -->
                 
             </tr>
@@ -47,12 +48,58 @@
         </tbody>
     </table>
 
-    <form method="post" class="mt-3">
+    
+    <form method="post" id="timed-form" class="mt-3">
         {% csrf_token %}
-        <button type="submit" class="btn btn-success">
-            Save Result Set
-        </button>
+        
+        {% if result_set %}
+            <button type="button"
+                    class="btn btn-warning"
+                    id="overwrite-btn">
+                Overwrite Existing Timed Result
+            </button>
+        {% else %}
+            <button type="submit"
+                    class="btn btn-success">
+                Build Timed Result Set
+            </button>
+        {% endif %}
     </form>
+
+    <!-- Overwrite Confirmation Modal -->
+    <div class="modal fade" id="overwriteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title">Overwrite Existing Result?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                A timed result set already exists.
+                <br><br>
+                Overwriting will permanently replace your previous result.
+            </div>
+
+            <div class="modal-footer">
+                <button type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal">
+                    Cancel
+                </button>
+
+                <button type="button"
+                        class="btn btn-danger"
+                        id="confirm-overwrite">
+                    Yes, Overwrite
+                </button>
+            </div>
+
+            </div>
+        </div>
+    </div>
+
 
 {% else %}
 
@@ -62,4 +109,30 @@
 
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+
+    const overwriteBtn = document.getElementById("overwrite-btn");
+
+    if(overwriteBtn){
+
+        const modal = new bootstrap.Modal(
+            document.getElementById("overwriteModal")
+        );
+
+        overwriteBtn.addEventListener("click", function(){
+            modal.show();
+        });
+
+        document.getElementById("confirm-overwrite")
+            .addEventListener("click", function(){
+                document.getElementById("timed-form").submit();
+            });
+    }
+
+});
+</script>
 {% endblock %}

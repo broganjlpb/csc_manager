@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results, reopen_results, league_table, active_leagues, timed_results, timed_results_edit, race_timer, race_event_api, live_race_page
+from .views import BoatTypeCreateView, BoatTypeUpdateView, BoatTypeListView, delete_entry, edit_entry, manual_results, reopen_results, league_table, active_leagues, timed_results, timed_results_edit, race_timer, race_event_api, live_race_page, unpublish_result_set
 from .views import RegisteredBoatListView, RegisteredBoatCreateView, RegisteredBoatUpdateView,LeagueListView, LeagueCreateView, LeagueUpdateView, RaceEntryListView, RaceCreateView, RaceListView ,add_entry, boat_py, manual_time_results, manual_results, select_result_set, publish_result_set
 from .views_api import live_race_state
 
@@ -50,5 +50,8 @@ urlpatterns = [
 
     path("races/<int:race_id>/results/", select_result_set, name="select-result-set"),
     path("results/<uuid:result_set_id>/publish/", publish_result_set, name="publish-result-set"),
+
+    path("results/<uuid:result_set_id>/publish/",publish_result_set,name="publish-result-set"),
+    path("results/<uuid:result_set_id>/unpublish/",unpublish_result_set,name="unpublish-result-set"),
 ]
 

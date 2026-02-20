@@ -1,0 +1,23 @@
+{% load race_extras %}
+<table class="table table-sm table-striped">
+<thead>
+<tr>
+    <th>Pos</th>
+    <th>Boat</th>
+    <th>Helm</th>
+    <th>Points</th>
+</tr>
+</thead>
+<tbody>
+{% for entry in rs.entries.all|dictsort:"finish_position" %}
+<tr>
+    <td>{{ entry.finish_position }}</td>
+    <td>{{ entry.race_entry.boat }}</td>
+    <td>{{ entry.race_entry.helm.username }}</td>
+    <td>{{ entry.finish_position|points }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+

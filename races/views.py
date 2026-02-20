@@ -527,6 +527,47 @@ def active_leagues(request):
 def race_timer(request, pk):
     race = get_object_or_404(Race, pk=pk)
     entries = race.entries.all()
+    # print(request.user)
+    existing = ResultSet.objects.filter(
+        race=race,
+        created_by=request.user,
+        source=ResultSet.Source.TIMED
+    ).first()
+    print(existing)
+
+    if existing:
+
+        # 🚫 If published → block completely
+        if existing.state == ResultSet.State.PUBLISHED:
+            messages.error(
+                request,
+                "You already have a published timed result set for this race. "
+                "You must unpublish it before starting a new timer session."
+            )
+            return redirect("select-result-set", race_id=race.id)
+
+        # # ⚠ If saved → warn but allow overwrite
+        # messages.warning(
+        #     request,
+        #     "You already have a timed result set for this race. "
+        #     "Starting a new timer session will overwrite it."
+        # )
+
+        # ⚠️ If exists but not published → require confirmation
+        confirm = request.GET.get("confirm")
+
+        if existing and not confirm:
+            return render(request, "races/confirm_overwrite_timer.html", {
+                "race": race,
+            })
+
+        entries = race.entries.all()
+
+        return render(request, "races/race_timer.html", {
+            "race": race,
+            "entries": entries,
+        })
+
 
     if request.method == "POST":
         data = json.loads(request.body)
@@ -864,6 +905,11 @@ def manual_time_results(request, race_id):
 def timed_results(request, race_id):
 
     race = get_object_or_404(Race, pk=race_id)
+    existing_result_set = ResultSet.objects.filter(
+        race=race,
+        source=ResultSet.Source.TIMED,
+        created_by=request.user
+    ).first()
 
     # Optional: view existing result set
     result_set_id = request.GET.get("result_set")
@@ -900,6 +946,8 @@ def timed_results(request, race_id):
             "result_set": result_set,
             "state": None,
             "attempt_numbers": None,
+            
+            
         })
 
     # ------------------------------------------
@@ -994,7 +1042,9 @@ def timed_results(request, race_id):
         "state": state,
         "preview": preview,
         "attempt_numbers": attempt_numbers,
-        "result_set": None,
+        # "result_set": None,
+        "result_set": existing_result_set,
+
     })
 
 
@@ -1026,20 +1076,38 @@ def select_result_set(request, race_id):
 
 def publish_result_set(request, result_set_id):
 
-    rs = get_object_or_404(ResultSet, pk=result_set_id)
+    result_set = get_object_or_404(ResultSet, pk=result_set_id)
+    race = result_set.race
 
     # Unpublish existing
     ResultSet.objects.filter(
-        race=rs.race,
+        race=race,
         state=ResultSet.State.PUBLISHED
-    ).update(state=ResultSet.State.SAVED)
+    ).update(
+        state=ResultSet.State.SAVED,
+        published_at=None
+    )
 
-    rs.state = ResultSet.State.PUBLISHED
-    rs.published_at = timezone.now()
-    rs.save()
+    result_set.state = ResultSet.State.PUBLISHED
+    result_set.published_at = timezone.now()
+    result_set.save()
 
     messages.success(request, "Result set published.")
 
-    return redirect("select-result-set", race_id=rs.race.id)
+    return redirect("select-result-set", race_id=race.id)
 
 #----------------------------------------------------------#
+
+
+def unpublish_result_set(request, result_set_id):
+
+    result_set = get_object_or_404(ResultSet, pk=result_set_id)
+
+    if result_set.state == ResultSet.State.PUBLISHED:
+        result_set.state = ResultSet.State.SAVED
+        result_set.published_at = None
+        result_set.save()
+
+        messages.info(request, "Result set unpublished.")
+
+    return redirect("select-result-set", race_id=result_set.race.id)

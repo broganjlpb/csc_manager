@@ -55,7 +55,7 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-LOGIN_REDIRECT_URL = "/members/"
+LOGIN_REDIRECT_URL = "/dashboard"
 LOGOUT_REDIRECT_URL = "/members/login/"
 LOGIN_URL = "/members/login/"
 
