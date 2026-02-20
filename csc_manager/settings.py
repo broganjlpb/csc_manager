@@ -12,25 +12,34 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import dj_database_url 
+import environ
 import os
+
+env = environ.Env(
+    # set casting, default value
+    DEBUG=(bool, False)
+)
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-xxd$eos(c_d*co0u2(wm_6rska5!d9iz(ya9u7axgcxc5rv3q9'
 
+SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
 
-ALLOWED_HOSTS = ['192.168.0.244','localhost','127.0.0.1','*']
+DEBUG = env("DEBUG")
 
+
+ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(" ")
 
 # Application definition
+
 
 INSTALLED_APPS = [
     "races",
@@ -45,6 +54,7 @@ INSTALLED_APPS = [
     'bootstrap5',
     'crispy_forms',
     'crispy_bootstrap5',
+    "environ",
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
@@ -100,20 +110,16 @@ WSGI_APPLICATION = 'csc_manager.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
 DATABASES = {
-    'default': dj_database_url.config(
-        # Replace this value with your local database's connection string.
-        default='postgresql://mysite:RyL46OVNFlC3NTe7DpepBfahQi2grApv@dpg-d6c4tb75r7bs73anlung-a/mysite_wfyx',
-        conn_max_age=600
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
+
+database_url = env("DATABASE_URL")
+DATABASES["default"] = dj_database_url.parse(database_url)
+
 
 
 # Password validation
