@@ -31,6 +31,25 @@ class RaceEntryForm(forms.ModelForm):
     class Meta:
         model = RaceEntry
         fields = ["helm", "crew", "boat", "py_used"]
+        widgets = {
+            "helm": forms.Select(attrs={
+                "class": "form-select",
+                "placeholder": "Helm",
+            }),
+            "crew": forms.Select(attrs={
+                "class": "form-select",
+                "placeholder": "Crew",
+            }),
+            "boat": forms.Select(attrs={
+                "class": "form-select",
+                "placeholder": "Boat",
+            }),
+            "py_used": forms.NumberInput(attrs={
+                "class": "form-control",
+                "placeholder": "PY",
+            }),
+        }
+
 
     def __init__(self, *args, race=None, **kwargs):
         self.race = race
