@@ -74,7 +74,7 @@ class MemberListView(ListView):
     template_name = "members/member_list.html"
     context_object_name = "members"
     ordering = ["email"]  
-    paginate_by = 10   # ⭐ number per page 
+    paginate_by = 50   # ⭐ number per page 
 
     def get_queryset(self):
         qs = super().get_queryset()
