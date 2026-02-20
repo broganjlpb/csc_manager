@@ -43,8 +43,8 @@
                 <div class="col-md-2" >{{ form.py_used }}</div>
                 <div id="entry-warning" class="text-danger small mt-2 d-none"></div>
                 <hr>
-                <div class="col-md-1">
-                    <button id="add-entry-btn" class="btn btn-dark btn-sm w-100">{% if editing_entry %}Save{% else %}Add{% endif %}</button>
+                <div class="col-md-3">
+                    <button id="add-entry-btn" class="btn btn-dark btn-sm w-100">{% if editing_entry %}Save{% else %}Add Boat to Race{% endif %}</button>
                 </div>
                 <div>
                     <a href="{% url 'race-results-manual' race.pk %}"
@@ -98,12 +98,12 @@
                         class="btn btn-sm btn-outline-secondary">
                             Edit
                         </a>
-
                         <a href="{% url 'race-entry-delete' race.pk e.pk %}"
                         class="btn btn-sm btn-outline-danger"
                         onclick="return confirm('Remove this entry?');">
                             Remove
                         </a>
+                        
                     </td>
                 </tr>
             {% empty %}
