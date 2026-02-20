@@ -85,6 +85,21 @@
         .navbar > .container-fluid {
             flex-wrap: nowrap;
         }
+
+        /* Compact floating selects */
+        .form-floating > .form-select,
+        .form-floating > .form-control {
+            padding-top: 0.9rem;
+            padding-bottom: 0.35rem;
+            height: calc(2.5rem + 2px);
+            min-height: calc(2.5rem + 2px);
+        }
+
+        /* Adjust floating label position */
+        .form-floating > label {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
