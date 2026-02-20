@@ -110,7 +110,7 @@ WSGI_APPLICATION = 'csc_manager.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config(
         # Replace this value with your local database's connection string.
-        default='postgresql://csc_render_postgres_user:v96xdVhUqyChIincTjFWWXzg6AlnVyjq@dpg-d6c3v7h4tr6s73da293g-a.frankfurt-postgres.render.com/csc_render_postgres',
+        default='postgresql://mysite:RyL46OVNFlC3NTe7DpepBfahQi2grApv@dpg-d6c4tb75r7bs73anlung-a/mysite_wfyx',
         conn_max_age=600
     )
 }
