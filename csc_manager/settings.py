@@ -110,15 +110,26 @@ WSGI_APPLICATION = 'csc_manager.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+use_local_db = os.environ.get("USE_LOCAL_DB",'false').lower()
+print(use_local_db)
 
-database_url = env("DATABASE_URL")
-DATABASES["default"] = dj_database_url.parse(database_url)
+if (use_local_db == 'true'):
+    DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+
+else:
+    DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+    database_url = env("DATABASE_URL")
+    DATABASES["default"] = dj_database_url.parse(database_url)
 
 
 
