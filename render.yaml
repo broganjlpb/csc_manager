@@ -1,8 +1,8 @@
 databases:
   - name: mysitedb
     plan: free
-    databaseName: csc-render-postgres
-    user: csc_render_postgres_user
+    databaseName: mysite
+    user: mysite
 
 services:
   - type: web
