@@ -57,6 +57,31 @@
 
             {% for race in races %}
                 <tr>
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ race.league|default:"—" }} ~ {{ race.event.start_datetime }}</h5>
+                            <p class="card-text">Status: {{ race.get_status_display }}</p>
+                            <a href="{% url 'race-entries' race.pk %}"
+                                class="btn btn-sm btn-outline-secondary">
+                                Race Tally
+                            </a>
+                            <a href="{% url 'select-result-set' race.id %}"
+                                class="btn btn-sm btn-outline-primary">
+                                Race Results
+                            </a>
+                            {% if race.has_events %}
+                                <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-success">
+                                    Live Timed Results
+                                </a>
+                                
+                            {% else %}
+                                <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-outline-primary">
+                                    Timed Results
+                                </a>
+                                
+                            {% endif %}
+                        </div>
+                    </div>
                     <td>{{ race.event.start_datetime }}</td>
                     <td>{{ race.league|default:"—" }}</td>
                     <td>{{ race.race_officer|default:"—" }}</td>
