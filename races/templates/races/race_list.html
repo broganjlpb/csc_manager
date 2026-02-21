@@ -61,8 +61,9 @@
                         <div class="card-body">
                             <h6 class="card-title"><div >League: {{ race.league|default:"—" }} </div> <div >Date: {{ race.event.start_datetime }}</div></h6>
                             <h6 class="card-text small">Status: {{ race.get_status_display }}</h6>
+                            
                             <a href="{% url 'race-entries' race.pk %}"
-                                class="btn btn-sm btn-outline-secondary">
+                                class="btn btn-sm btn-outline-secondary ">
                                 Race Tally
                             </a>
                             <a href="{% url 'select-result-set' race.id %}"
@@ -80,6 +81,7 @@
                                 </a>
                                 
                             {% endif %}
+                            
                         </div>
                     </div>
                     
