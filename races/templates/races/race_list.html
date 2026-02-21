@@ -63,22 +63,42 @@
                     <td>{{ race.get_status_display }}</td>
                     <td class="text-end">
 
-                        <a href="{% url 'race-entries' race.pk %}"
+                        <!-- <a href="{% url 'race-entries' race.pk %}"
                            class="btn btn-sm btn-outline-secondary">
                            Entries
+                        </a> -->
+                        <a href="{% url 'race-entries' race.pk %}"
+                            class="btn btn-sm btn-outline-secondary btn-icon"
+                            title="Review Race Tally">
+                                <i class="bi bi-book"></i>
                         </a>
                        
-                        <a href="{% url 'select-result-set' race.id %}"
+                        <!-- <a href="{% url 'select-result-set' race.id %}"
                             class="btn btn-sm btn-outline-primary">
                             Results
+                        </a> -->
+                        <a href="{% url 'select-result-set' race.id %}"
+                            class="btn btn-sm btn-outline-secondary btn-icon"
+                            title="Race Results">
+                                <i class="bi bi-clipboard2-data"></i>
                         </a>
                         {% if race.has_events %}
-                        <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-success">
+                            <!-- <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-success">
                                 Live
+                            </a> -->
+                            <a href="{% url 'race-live' race.id %}"
+                                class="btn btn-sm btn-outline-success btn-icon"
+                                title="Live Timed Race Results">
+                                    <i class="bi bi-file-earmark-richtext-fill"></i>
                             </a>
                         {% else %}
-                            <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-outline-primary">
+                            <!-- <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-outline-primary">
                                 Live
+                            </a> -->
+                            <a href="{% url 'race-live' race.id %}"
+                                class="btn btn-sm btn-outline-secondary btn-icon"
+                                title="Latest Timed Race Results">
+                                    <i class="bi bi-file-earmark-richtext"></i>
                             </a>
                         {% endif %}
                         
