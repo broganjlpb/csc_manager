@@ -43,7 +43,7 @@
 </form>
 
 
-    <div class="d-flex flex-column" style="height: calc(100vh - 220px);">
+    <div class="d-flex flex-column" style="height: calc(100vh - 240px);">
     <div class="flex-grow-1 overflow-auto">
             {% for race in races %}
                 
@@ -54,20 +54,20 @@
                             
                             <a href="{% url 'race-entries' race.pk %}"
                                 class="btn btn-sm btn-outline-secondary ">
-                                Race Tally
+                                Tally
                             </a>
                             <a href="{% url 'select-result-set' race.id %}"
                                 class="btn btn-sm btn-outline-primary">
-                                Race Results
+                                All Results
                             </a>
                             {% if race.has_events %}
                                 <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-success">
-                                    Live Timed
+                                    Timed
                                 </a>
                                 
                             {% else %}
                                 <a href="{% url 'race-live' race.id %}" class="btn btn-sm btn-outline-primary">
-                                    Timed Results
+                                    Pending Timed
                                 </a>
                                 
                             {% endif %}
