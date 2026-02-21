@@ -65,7 +65,7 @@ class Member(AbstractUser):
         return self.full_name or self.username or self.email
 
     def __str__(self):
-        return self.email
+        return self.username
 
 
 
