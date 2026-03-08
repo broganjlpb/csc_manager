@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h3>Select Result Set – {{ race }}</h3>
+<h3>Select Result Set – {{ race }} - Race ID: {{race.id}} - League: {{race.league.name}}</h3>
 
 {% if published %}
 <div class="alert alert-success">

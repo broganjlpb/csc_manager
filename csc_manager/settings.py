@@ -14,16 +14,22 @@ from pathlib import Path
 import dj_database_url 
 import environ
 import os
+from decouple import config
 
 env = environ.Env(
     # set casting, default value
     DEBUG=(bool, False)
 )
 
+ENVIRONMENT = config("ENVIRONMENT", default="UNKNOWN")
+
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -99,12 +105,20 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "csc_manager.context_processors.template_settings",
             ],
         },
     },
 ]
 
+TEMPLATE_VISIBLE_SETTINGS = [
+    "ENVIRONMENT",
+]
+
+
+
 WSGI_APPLICATION = 'csc_manager.wsgi.application'
+
 
 
 # Database
