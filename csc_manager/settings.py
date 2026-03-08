@@ -117,6 +117,7 @@ TEMPLATE_VISIBLE_SETTINGS = [
 
 
 
+
 WSGI_APPLICATION = 'csc_manager.wsgi.application'
 
 
