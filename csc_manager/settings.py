@@ -111,9 +111,7 @@ TEMPLATES = [
     },
 ]
 
-TEMPLATE_VISIBLE_SETTINGS = [
-    "ENVIRONMENT",
-]
+
 
 
 
@@ -203,3 +201,8 @@ EMAIL_FILE_PATH = BASE_DIR / "sent_emails"
 DEFAULT_FROM_EMAIL = "no-reply@csc.local"
 
 #######################
+
+TEMPLATE_VISIBLE_SETTINGS = [
+    "ENVIRONMENT",
+    "DATABASES",
+]
